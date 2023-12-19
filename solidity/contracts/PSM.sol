@@ -12,6 +12,16 @@ contract AutoDepositCompound {
     address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
 
     mapping(address => bool) public approvedCTokens;
+
+    struct PanicCallData {
+        address target;
+        bytes data;
+        bool called;
+        address underlying;
+    }
+
+    mapping(address => PanicCallData) public panicCalls;
+
     uint256 public totalStableDeposited;
     uint256 public depositFee;
     uint256 public withdrawalFee;
@@ -105,5 +115,20 @@ contract AutoDepositCompound {
     function updateOwner(address newOwner) external onlyOwner {
         owner = newOwner;
         emit OwnerUpdated(newOwner);
+    }
+
+    /*
+        Big Question-mark
+
+        Do we prefer calling this as panic which will have predetermined ways to panic itself?
+        Or do we prefer draining by minting MAI, swapping, and draining that liquidity that way?
+        Then we have more fine-grained control of how we deposit it back, instead of just having underlying...
+        It could be part of a bigger issue such as depegs or bridge hacks
+    */
+
+    function callPanic(address token) external {
+        require(!panicCalls[token].called, "callPanic already executed here");
+        (bool success, bytes memory returnData) = panicCalls[token].target.delegatecall(panicCalls[token].data);
+        require(success, "Delegatecall failed");
     }
 }
