@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: agpl-3.0
 
-pragma solidity 0.8.19;
+pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
-contract Pesem is ERC20, ReentrancyGuard {
+contract PesemComp is ERC20, ReentrancyGuard {
     using SafeERC20 for ERC20;
 
     /// @dev Constants used across the contract.
@@ -38,12 +38,12 @@ contract Pesem is ERC20, ReentrancyGuard {
         revMgr = _revMgr;
     }
 
-    function setName(string memory name) public onlyOwner() {
-        _name=name;
+    function setName(string memory __name) public onlyOwner() {
+        _name=__name;
     }
 
-    function setSymbol(string memory symbol) public onlyOwner() {
-        _symbol=symbol;
+    function setSymbol(string memory __symbol) public onlyOwner() {
+        _symbol=__symbol;
     }
 
     function name() public view override returns (string memory) {
