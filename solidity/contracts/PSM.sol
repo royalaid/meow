@@ -37,6 +37,8 @@ contract AutoDepositCompound {
     event FeesUpdated(uint256 newDepositFee, uint256 newWithdrawalFee);
     event MinimumFeesUpdated(uint256 newMinimumDepositFee, uint256 newMinimumWithdrawalFee);
     event OwnerUpdated(address newOwner);
+    event MAIRemoved(address indexed user, uint256 amount);
+    event FeesWithdrawn(address indexed owner, uint256 feesEarned);
 
     constructor(uint256 _depositFee, uint256 _withdrawalFee, uint256 _minimumDepositFee, uint256 _minimumWithdrawalFee) {
         depositFee = _depositFee;
@@ -51,8 +53,9 @@ contract AutoDepositCompound {
         _;
     }
 
-    function approveCToken(address cToken) external onlyOwner {
-        approvedCTokens[cToken] = true;
+    function updateCToken(address cToken, bool _approved) external onlyOwner {
+        approvedCTokens[cToken] = _approved;
+        panicCalls[cToken].called = false;
         emit CTokenApproved(cToken);
     }
     
@@ -98,6 +101,7 @@ contract AutoDepositCompound {
         uint256 compBalance = IERC20(cToken).balanceOf(address(this));
         uint256 FeesEarned = compBalance - totalStableDeposited;
         IERC20(cToken).transfer(owner, FeesEarned);
+        emit FeesWithdrawn(owner, FeesEarned);
     }
 
     function updateFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
@@ -117,6 +121,13 @@ contract AutoDepositCompound {
         emit OwnerUpdated(newOwner);
     }
 
+    function removeMAI() external onlyOwner {
+        IERC20 mai = IERC20(MAI_ADDRESS);
+        uint256 bal = mai.balanceOf(address(this));
+        mai.transfer(msg.sender, bal);
+        emit MAIRemoved(msg.sender, bal);
+    }
+
     /*
         Big Question-mark
 
@@ -130,5 +141,6 @@ contract AutoDepositCompound {
         require(!panicCalls[token].called, "callPanic already executed here");
         (bool success, bytes memory returnData) = panicCalls[token].target.delegatecall(panicCalls[token].data);
         require(success, "Delegatecall failed");
+
     }
 }
