@@ -1,5 +1,11 @@
 pragma solidity 0.8.20;
 
+/*
+    reading material:
+    https://github.com/BellwoodStudios/dss-psm/blob/master/src/psm.sol
+
+*/
+
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function transfer(address recipient, uint256 amount) external returns (bool);
@@ -141,6 +147,5 @@ contract AutoDepositCompound {
         require(!panicCalls[token].called, "callPanic already executed here");
         (bool success, bytes memory returnData) = panicCalls[token].target.delegatecall(panicCalls[token].data);
         require(success, "Delegatecall failed");
-
     }
 }
