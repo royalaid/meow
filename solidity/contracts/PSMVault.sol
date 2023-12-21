@@ -32,7 +32,6 @@ contract PSMVaultGeneric {
 
     bytes public data;
     bool public panic;
-    bool public panicked;
 
     // Events
     event Deposited(address indexed user, uint256 amount);
@@ -65,9 +64,8 @@ contract PSMVaultGeneric {
     }
     
     // always assume 6 decimals
-
     function deposit(uint256 amount) external {
-        require(amount > minimumDepositFee, 'Amount must be greater than fee');
+        require(amount > minimumDepositFee && !panic, 'Invalid amount');
 
         uint256 fee = calculateDepositFee(amount);
         uint256 amountAfterFee = amount - fee;
@@ -86,7 +84,12 @@ contract PSMVaultGeneric {
         uint256 fee = calculateWithdrawalFee(amount);
         uint256 amountAfterFee = amount - fee;
         totalStableDeposited -= amount;
-        IERC20(gem).transfer(msg.sender, amountAfterFee);
+
+        if(panic){
+            IERC20(underlying).transfer(msg.sender, amountAfterFee);
+        }else {
+            IERC20(gem).transfer(msg.sender, amountAfterFee);
+        }
 
         emit Withdrawn(msg.sender, amountAfterFee);
     }
@@ -99,13 +102,6 @@ contract PSMVaultGeneric {
     function calculateWithdrawalFee(uint256 amount) public view returns (uint256) {
         uint256 fee = amount * withdrawalFee / 10000;
         return fee < minimumWithdrawalFee ? minimumWithdrawalFee : fee;
-    }
-
-    function withdrawFees() public onlyOwner {
-        uint256 compBalance = IERC20(gem).balanceOf(address(this));
-        uint256 FeesEarned = compBalance - totalStableDeposited;
-        IERC20(gem).transfer(owner, FeesEarned);
-        emit FeesWithdrawn(owner, FeesEarned);
     }
 
     function updateFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
@@ -125,15 +121,22 @@ contract PSMVaultGeneric {
         emit OwnerUpdated(newOwner);
     }
 
+    function withdrawFees() external onlyOwner {
+        uint256 compBalance = IERC20(gem).balanceOf(address(this));
+        uint256 FeesEarned = compBalance - totalStableDeposited;
+        IERC20(gem).transfer(owner, FeesEarned);
+        emit FeesWithdrawn(owner, FeesEarned);
+    }
+
     function removeMAI() external onlyOwner {
         IERC20 mai = IERC20(MAI_ADDRESS);
         uint256 bal = mai.balanceOf(address(this));
         mai.transfer(msg.sender, bal);
-        emit MAIRemovedByBy(msg.sender, bal);
+        emit MAIRemovedBy(msg.sender, bal);
     }
 
     function callPanic() external {
-        require(!panicked, 'Already panicking');
+        require(!panic, 'Already panicking');
         (bool success,) = target.delegatecall(data);
         require(success, 'Panic failed');   
     }
