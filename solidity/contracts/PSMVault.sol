@@ -102,7 +102,7 @@ contract PSMVaultGeneric {
     }
 
     function withdrawFees() public onlyOwner {
-        uint256 compBalance = IERC20(MAI_ADDRESS).balanceOf(address(this));
+        uint256 compBalance = IERC20(gem).balanceOf(address(this));
         uint256 FeesEarned = compBalance - totalStableDeposited;
         IERC20(gem).transfer(owner, FeesEarned);
         emit FeesWithdrawn(owner, FeesEarned);
@@ -129,7 +129,7 @@ contract PSMVaultGeneric {
         IERC20 mai = IERC20(MAI_ADDRESS);
         uint256 bal = mai.balanceOf(address(this));
         mai.transfer(msg.sender, bal);
-        emit MAIRemovedBy(msg.sender, bal);
+        emit MAIRemovedByBy(msg.sender, bal);
     }
 
     function callPanic() external {
