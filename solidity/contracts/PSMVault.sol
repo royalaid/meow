@@ -13,45 +13,49 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
-contract AutoDepositCompound {
+contract PSMVaultGeneric {
     uint256 public constant MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
     address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
-
-    mapping(address => bool) public approvedGems;
-
-    struct PanicCallData {
-        address target;
-        bytes data;
-        bool called;
-        address underlying;
-    }
-
-    mapping(address => PanicCallData) public panicCalls;
 
     uint256 public totalStableDeposited;
     uint256 public depositFee;
     uint256 public withdrawalFee;
     uint256 public minimumDepositFee;
     uint256 public minimumWithdrawalFee;
-    
+    uint256 public underlyingDecimals;
+    uint256 public constant maiDecimals = 1e18;
+
+    address public target;
+    address public underlying;
     address public owner;
+    address public gem;
+
+    bytes public data;
+    bool public panic;
+    bool public panicked;
 
     // Events
-    event GemApproved(address indexed gem);
-    event Deposited(address indexed user, address indexed gem, uint256 amount);
-    event Withdrawn(address indexed user, address indexed gem, uint256 amount);
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
     event FeesUpdated(uint256 newDepositFee, uint256 newWithdrawalFee);
     event MinimumFeesUpdated(uint256 newMinimumDepositFee, uint256 newMinimumWithdrawalFee);
     event OwnerUpdated(address newOwner);
-    event MAIRemoved(address indexed user, uint256 amount);
+    event MAIRemovedBy(address indexed user, uint256 amount);
     event FeesWithdrawn(address indexed owner, uint256 feesEarned);
-    event GemPanicUpdated(address indexed gem, address target, bytes data, address underlying, bool called);
+    event PanicCallUpdated(address target, bytes data, bool called);
 
-    constructor(uint256 _depositFee, uint256 _withdrawalFee, uint256 _minimumDepositFee, uint256 _minimumWithdrawalFee) {
+    // data 0xf3fef3a3000000000000000000000000d9aaec86b65d86f6a7b5b1b0c42ffa531710b6caffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
+    constructor(address _gem, address _underlying, uint256 _underlyingDecimals, uint256 _depositFee, uint256 _withdrawalFee, bytes memory _data, address _target) {
         depositFee = _depositFee;
         withdrawalFee = _withdrawalFee;
-        minimumDepositFee = _minimumDepositFee;
-        minimumWithdrawalFee = _minimumWithdrawalFee;
+        minimumDepositFee = 1000000; // 1 dollar
+        minimumWithdrawalFee = 1000000; // 1 dollar
+        underlying = _underlying;
+        underlyingDecimals = _underlyingDecimals;
+        data = _data;
+        gem = _gem;
+        target = _target;
         owner = msg.sender;
     }
 
@@ -59,46 +63,32 @@ contract AutoDepositCompound {
         require(msg.sender == owner, 'Caller is not the owner');
         _;
     }
-
-    function updateGem(address gem, bool _approved) external onlyOwner {
-        approvedGems[gem] = _approved;
-        emit GemApproved(gem);
-    }
-
-    function updateGemPanic(address gem, address _target, bytes memory _data, address _underlying, bool _called) external onlyOwner {
-        panicCalls[gem].called = _called;
-        panicCalls[gem].target = _target;
-        panicCalls[gem].underlying = _underlying;
-        panicCalls[gem].data = _data;
-        emit GemApproved(gem);
-        emit GemPanicUpdated(gem, _target, _data, _underlying, _called);
-    }
     
-    function deposit(address gem, uint256 amount) external {
-        require(approvedGems[gem], 'Gem is not approved');
-        require(amount > minimumDepositFee, 'Amount must be greater than minimumDepositFee');
+    // always assume 6 decimals
+
+    function deposit(uint256 amount) external {
+        require(amount > minimumDepositFee, 'Amount must be greater than fee');
 
         uint256 fee = calculateDepositFee(amount);
         uint256 amountAfterFee = amount - fee;
 
         IERC20(gem).transferFrom(msg.sender, address(this), amount);
         totalStableDeposited += amountAfterFee;
-        IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountAfterFee);
+        IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountAfterFee * (maiDecimals - underlyingDecimals));
 
-        emit Deposited(msg.sender, gem, amountAfterFee);
+        emit Deposited(msg.sender, amountAfterFee);
     }
 
-    function withdraw(address gem, uint256 amount) external {
-        require(approvedGems[gem], 'Gem is not approved');
+    function withdraw(uint256 amount) external {
         require(amount > minimumWithdrawalFee && amount <= totalStableDeposited, 'Invalid amount');
 
-        IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
+        IERC20(MAI_ADDRESS).transfer(msg.sender, amount* (maiDecimals - underlyingDecimals));
         uint256 fee = calculateWithdrawalFee(amount);
         uint256 amountAfterFee = amount - fee;
         totalStableDeposited -= amount;
         IERC20(gem).transfer(msg.sender, amountAfterFee);
 
-        emit Withdrawn(msg.sender, gem, amountAfterFee);
+        emit Withdrawn(msg.sender, amountAfterFee);
     }
 
     function calculateDepositFee(uint256 amount) public view returns (uint256) {
@@ -111,9 +101,8 @@ contract AutoDepositCompound {
         return fee < minimumWithdrawalFee ? minimumWithdrawalFee : fee;
     }
 
-    function withdrawFees(address gem) public onlyOwner {
-        require(approvedGems[gem], 'Gem is not approved');
-        uint256 compBalance = IERC20(gem).balanceOf(address(this));
+    function withdrawFees() public onlyOwner {
+        uint256 compBalance = IERC20(MAI_ADDRESS).balanceOf(address(this));
         uint256 FeesEarned = compBalance - totalStableDeposited;
         IERC20(gem).transfer(owner, FeesEarned);
         emit FeesWithdrawn(owner, FeesEarned);
@@ -140,13 +129,12 @@ contract AutoDepositCompound {
         IERC20 mai = IERC20(MAI_ADDRESS);
         uint256 bal = mai.balanceOf(address(this));
         mai.transfer(msg.sender, bal);
-        emit MAIRemoved(msg.sender, bal);
+        emit MAIRemovedBy(msg.sender, bal);
     }
 
-    function callPanic(address token) external {
-        require(!panicCalls[token].called, "callPanic already executed here");
-        (bool success, bytes memory returnData) = panicCalls[token].target.delegatecall(panicCalls[token].data);
-
-        require(success, "Delegatecall failed");
+    function callPanic() external {
+        require(!panicked, 'Already panicking');
+        (bool success,) = target.delegatecall(data);
+        require(success, 'Panic failed');   
     }
 }

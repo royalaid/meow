@@ -18,9 +18,8 @@ contract AutoDepositCompound {
     uint256 public withdrawalFee;
     uint256 public minimumDepositFee;
     uint256 public minimumWithdrawalFee;
-    
-    address public owner;
 
+    address public owner;
     // Events
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
@@ -98,4 +97,5 @@ contract AutoDepositCompound {
         owner = newOwner;
         emit OwnerUpdated(newOwner);
     }
+    
 }
