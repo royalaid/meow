@@ -22,19 +22,21 @@ contract PSMVaultGeneric {
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
   address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
 
-  uint256 public totalShareLiquidity;
+  uint256 public totalStableLiquidity;
   uint256 public depositFee;
   uint256 public withdrawalFee;
   uint256 public minimumDepositFee;
   uint256 public minimumWithdrawalFee;
+
+  uint256 public totalFees;
+  uint256 public accumulatedFees;
 
   address public target;
   address public underlying;
   address public owner;
   address public gem;
 
-  bytes public data;
-  bool public panic;
+  bool public paused;
 
   // Events
   event Deposited(address indexed user, uint256 amount);
@@ -44,8 +46,8 @@ contract PSMVaultGeneric {
   event OwnerUpdated(address newOwner);
   event MAIRemoved(address indexed user, uint256 amount);
   event FeesWithdrawn(address indexed owner, uint256 feesEarned);
+  event PauseEvent(address account, bool paused);
 
-  // data 0xf3fef3a3000000000000000000000000d9aaec86b65d86f6a7b5b1b0c42ffa531710b6caffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
   // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
   constructor(
     address _gem,
@@ -69,36 +71,42 @@ contract PSMVaultGeneric {
     _;
   }
 
+  modifier pausable() {
+    require(!paused, 'Contract is paused');
+    _;
+  }
+
   // user deposits shares, withdraws stable
-  function deposit(uint256 amount) external {
+  function deposit(uint256 amount) external pausable {
     uint256 fee = calculateDepositFee(amount);
 
     require(amount > fee, 'Invalid amount');
 
     uint256 amountAfterFee = amount - fee;
-    uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18; // bigger number bc shares worth more in stable
+    uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18;
 
     IERC20(gem).transferFrom(msg.sender, address(this), amount);
-    totalShareLiquidity += amountAfterFee;
-    IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountOfUnderlying);
+    totalStableLiquidity += amountOfUnderlying;
+    accumulatedFees+=fee;
+
+    IERC20(MAI_ADDRESS).transfer(msg.sender, amountOfUnderlying);
 
     emit Deposited(msg.sender, amountAfterFee);
   }
 
 // user deposits stable, withdraws shares
-  function withdraw(uint256 amount) external {
-    IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
+  function withdraw(uint256 amount) external pausable {
+    IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), amount);
 
-    uint256 amountOfShares =  amount * 1e18 / IBeefy(gem).getPricePerFullShare();
+    uint256 amountOfShares = amount * 1e18 / IBeefy(gem).getPricePerFullShare();
     uint256 fee = calculateWithdrawalFee(amountOfShares);
 
-    require(amountOfShares > fee, 'Invalid amount');
+    require(amountOfShares > fee && amount <= totalStableLiquidity, 'Invalid amount');
 
     uint256 amountOfSharesAfterFee = amountOfShares - fee;
 
-    require(amount > minimumWithdrawalFee && amountOfShares <= totalShareLiquidity, 'Invalid amount');
-
-    totalShareLiquidity -= amountOfShares;
+    totalStableLiquidity -= amount; // removes an amount of stables
+    accumulatedFees+=fee;
 
     IERC20(gem).transfer(msg.sender, amountOfSharesAfterFee);
 
@@ -133,10 +141,10 @@ contract PSMVaultGeneric {
   }
 
   function withdrawFees() external {
-    uint256 gemBalance = IERC20(gem).balanceOf(address(this));
-    uint256 FeesEarned = gemBalance - totalShareLiquidity;
-    IERC20(gem).transfer(owner, FeesEarned);
-    emit FeesWithdrawn(owner, FeesEarned);
+    totalFees+=accumulatedFees;
+    IERC20(gem).transfer(owner, accumulatedFees);
+    emit FeesWithdrawn(owner, accumulatedFees);
+    accumulatedFees=0;
   }
 
   function removeMAI() external onlyOwner {
@@ -144,5 +152,10 @@ contract PSMVaultGeneric {
     uint256 bal = mai.balanceOf(address(this));
     mai.transfer(msg.sender, bal);
     emit MAIRemoved(msg.sender, bal);
+  }
+
+  function togglePause(bool _paused) external onlyOwner {
+    paused = _paused;
+    emit PauseEvent(msg.sender, _paused);
   }
 }
