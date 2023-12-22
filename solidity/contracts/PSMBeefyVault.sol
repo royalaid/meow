@@ -71,9 +71,10 @@ contract PSMVaultGeneric {
 
   // user deposits shares, withdraws stable
   function deposit(uint256 amount) external {
-    require(amount > minimumDepositFee, 'Invalid amount');
-
     uint256 fee = calculateDepositFee(amount);
+
+    require(amount > fee, 'Invalid amount');
+
     uint256 amountAfterFee = amount - fee;
     uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18; // bigger number bc shares worth more in stable
 
@@ -86,13 +87,16 @@ contract PSMVaultGeneric {
 
 // user deposits stable, withdraws shares
   function withdraw(uint256 amount) external {
-    require(amount > minimumWithdrawalFee && amount <= totalShareLiquidity, 'Invalid amount');
-
     IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
 
     uint256 amountOfShares =  amount * 1e18 / IBeefy(gem).getPricePerFullShare();
     uint256 fee = calculateWithdrawalFee(amountOfShares);
+
+    require(amountOfShares > fee, 'Invalid amount');
+
     uint256 amountOfSharesAfterFee = amountOfShares - fee;
+
+    require(amount > minimumWithdrawalFee && amountOfShares <= totalShareLiquidity, 'Invalid amount');
 
     totalShareLiquidity -= amountOfShares;
 
