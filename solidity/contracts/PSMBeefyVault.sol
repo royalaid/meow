@@ -69,29 +69,30 @@ contract PSMVaultGeneric {
     _;
   }
 
-  // always assume 18 decimals
+  // user deposits shares, withdraws stable
   function deposit(uint256 amount) external {
     require(amount > minimumDepositFee, 'Invalid amount');
 
     uint256 fee = calculateDepositFee(amount);
     uint256 amountAfterFee = amount - fee;
-    uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18;
+    uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18; // bigger number bc shares worth more in stable
 
     IERC20(gem).transferFrom(msg.sender, address(this), amount);
-    totalStableLiquidity += amountOfUnderlying;
+    totalStableLiquidity += amountAfterFee;
     IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountOfUnderlying);
 
     emit Deposited(msg.sender, amountAfterFee);
   }
 
+// user deposits stable, withdraws shares
   function withdraw(uint256 amount) external {
     require(amount > minimumWithdrawalFee && amount <= totalStableLiquidity, 'Invalid amount');
 
     IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
-    uint256 amountOfShares = IBeefy(gem).getPricePerFullShare() * amount / 1e18;
+
+    uint256 amountOfShares =  amount * 1e18 / IBeefy(gem).getPricePerFullShare();
     uint256 fee = calculateWithdrawalFee(amountOfShares);
-    uint256 amountAfterFee = amount - fee;
-    uint256 amountOfSharesAfterFee = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18;
+    uint256 amountOfSharesAfterFee = amountOfShares - fee;
 
     totalStableLiquidity -= amountOfShares;
 
@@ -129,7 +130,7 @@ contract PSMVaultGeneric {
 
   function withdrawFees() external {
     uint256 gemBalance = IERC20(gem).balanceOf(address(this));
-    uint256 FeesEarned = gemBalance - totalStableLiquidity;
+    uint256 FeesEarned = (gemBalance * IBeefy(gem).getPricePerFullShare() / 1e18) - totalStableLiquidity;
     IERC20(gem).transfer(owner, FeesEarned);
     emit FeesWithdrawn(owner, FeesEarned);
   }
