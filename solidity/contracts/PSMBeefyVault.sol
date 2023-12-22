@@ -49,16 +49,10 @@ contract PSMVaultGeneric {
   event PauseEvent(address account, bool paused);
 
   // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
-  constructor(
-    address _gem,
-    address _underlying,
-    uint256 _depositFee,
-    uint256 _withdrawalFee,
-    address _target
-  ) {
+  constructor(address _gem, address _underlying, uint256 _depositFee, uint256 _withdrawalFee, address _target) {
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    minimumDepositFee = 1_000_000; // 
+    minimumDepositFee = 1_000_000; //
     minimumWithdrawalFee = 1_000_000; //
     underlying = _underlying;
     gem = _gem;
@@ -87,14 +81,14 @@ contract PSMVaultGeneric {
 
     IERC20(gem).transferFrom(msg.sender, address(this), amount);
     totalStableLiquidity += amountOfUnderlying;
-    accumulatedFees+=fee;
+    accumulatedFees += fee;
 
     IERC20(MAI_ADDRESS).transfer(msg.sender, amountOfUnderlying);
 
     emit Deposited(msg.sender, amountAfterFee);
   }
 
-// user deposits stable, withdraws shares
+  // user deposits stable, withdraws shares
   function withdraw(uint256 amount) external pausable {
     IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), amount);
 
@@ -106,7 +100,7 @@ contract PSMVaultGeneric {
     uint256 amountOfSharesAfterFee = amountOfShares - fee;
 
     totalStableLiquidity -= amount; // removes an amount of stables
-    accumulatedFees+=fee;
+    accumulatedFees += fee;
 
     IERC20(gem).transfer(msg.sender, amountOfSharesAfterFee);
 
@@ -141,10 +135,10 @@ contract PSMVaultGeneric {
   }
 
   function withdrawFees() external {
-    totalFees+=accumulatedFees;
+    totalFees += accumulatedFees;
     IERC20(gem).transfer(owner, accumulatedFees);
     emit FeesWithdrawn(owner, accumulatedFees);
-    accumulatedFees=0;
+    accumulatedFees = 0;
   }
 
   function removeMAI() external onlyOwner {
