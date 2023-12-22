@@ -134,7 +134,7 @@ contract PSMVaultGeneric {
 
   function withdrawFees() external {
     uint256 gemBalance = IERC20(gem).balanceOf(address(this));
-    uint256 FeesEarned = (gemBalance * IBeefy(gem).getPricePerFullShare() / 1e18) - totalShareLiquidity;
+    uint256 FeesEarned = gemBalance - totalShareLiquidity;
     IERC20(gem).transfer(owner, FeesEarned);
     emit FeesWithdrawn(owner, FeesEarned);
   }
