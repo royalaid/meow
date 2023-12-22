@@ -56,8 +56,8 @@ contract PSMVaultGeneric {
   ) {
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    minimumDepositFee = 1_000_000; // 1 dollar
-    minimumWithdrawalFee = 1_000_000; // 1 dollar
+    minimumDepositFee = 1_000_000; // 
+    minimumWithdrawalFee = 1_000_000; //
     underlying = _underlying;
     gem = _gem;
     target = _target;
@@ -79,7 +79,7 @@ contract PSMVaultGeneric {
 
     IERC20(gem).transferFrom(msg.sender, address(this), amount);
     totalStableLiquidity += amountOfUnderlying;
-    IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountAfterFee);
+    IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountOfUnderlying);
 
     emit Deposited(msg.sender, amountAfterFee);
   }
@@ -127,7 +127,7 @@ contract PSMVaultGeneric {
     emit OwnerUpdated(newOwner);
   }
 
-  function withdrawFees() external onlyOwner {
+  function withdrawFees() external {
     uint256 gemBalance = IERC20(gem).balanceOf(address(this));
     uint256 FeesEarned = gemBalance - totalStableLiquidity;
     IERC20(gem).transfer(owner, FeesEarned);
