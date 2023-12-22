@@ -88,9 +88,9 @@ contract PSMVaultGeneric {
     require(amount > minimumWithdrawalFee && amount <= totalStableLiquidity, 'Invalid amount');
 
     IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
-    uint256 fee = calculateWithdrawalFee(amount);
-    uint256 amountAfterFee = amount - fee;
     uint256 amountOfShares = IBeefy(gem).getPricePerFullShare() * amount / 1e18;
+    uint256 fee = calculateWithdrawalFee(amountOfShares);
+    uint256 amountAfterFee = amount - fee;
     uint256 amountOfSharesAfterFee = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18;
 
     totalStableLiquidity -= amountOfShares;
@@ -113,7 +113,7 @@ contract PSMVaultGeneric {
   function updateFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    emit FeesUpdated(_depositFee, _withdrawalFee);smal
+    emit FeesUpdated(_depositFee, _withdrawalFee);
   }
 
   function updateMinimumFees(uint256 _minimumDepositFee, uint256 _minimumWithdrawalFee) external onlyOwner {
