@@ -22,7 +22,7 @@ contract PSMVaultGeneric {
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
   address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
 
-  uint256 public totalStableLiquidity;
+  uint256 public totalShareLiquidity;
   uint256 public depositFee;
   uint256 public withdrawalFee;
   uint256 public minimumDepositFee;
@@ -78,7 +78,7 @@ contract PSMVaultGeneric {
     uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18; // bigger number bc shares worth more in stable
 
     IERC20(gem).transferFrom(msg.sender, address(this), amount);
-    totalStableLiquidity += amountAfterFee;
+    totalShareLiquidity += amountAfterFee;
     IERC20(MAI_ADDRESS).transferFrom(address(this), msg.sender, amountOfUnderlying);
 
     emit Deposited(msg.sender, amountAfterFee);
@@ -86,7 +86,7 @@ contract PSMVaultGeneric {
 
 // user deposits stable, withdraws shares
   function withdraw(uint256 amount) external {
-    require(amount > minimumWithdrawalFee && amount <= totalStableLiquidity, 'Invalid amount');
+    require(amount > minimumWithdrawalFee && amount <= totalShareLiquidity, 'Invalid amount');
 
     IERC20(MAI_ADDRESS).transfer(msg.sender, amount);
 
@@ -94,7 +94,7 @@ contract PSMVaultGeneric {
     uint256 fee = calculateWithdrawalFee(amountOfShares);
     uint256 amountOfSharesAfterFee = amountOfShares - fee;
 
-    totalStableLiquidity -= amountOfShares;
+    totalShareLiquidity -= amountOfShares;
 
     IERC20(gem).transfer(msg.sender, amountOfSharesAfterFee);
 
@@ -130,7 +130,7 @@ contract PSMVaultGeneric {
 
   function withdrawFees() external {
     uint256 gemBalance = IERC20(gem).balanceOf(address(this));
-    uint256 FeesEarned = (gemBalance * IBeefy(gem).getPricePerFullShare() / 1e18) - totalStableLiquidity;
+    uint256 FeesEarned = (gemBalance * IBeefy(gem).getPricePerFullShare() / 1e18) - totalShareLiquidity;
     IERC20(gem).transfer(owner, FeesEarned);
     emit FeesWithdrawn(owner, FeesEarned);
   }
