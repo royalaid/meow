@@ -135,7 +135,7 @@ contract PSMVaultGeneric {
   }
 
   function withdrawFees() external {
-    totalFees += accumulatedFees;
+    totalFees += accumulatedFees * IBeefy(gem).getPricePerFullShare() / 1e18; // convert to underlying to set the token value.
     IERC20(gem).transfer(owner, accumulatedFees);
     emit FeesWithdrawn(owner, accumulatedFees);
     accumulatedFees = 0;
