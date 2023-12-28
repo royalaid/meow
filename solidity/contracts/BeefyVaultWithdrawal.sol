@@ -38,6 +38,16 @@ contract BeefyVaultWithdrawal {
 
   bool public paused;
 
+  error CallerIsNotOwner();
+  error ContractIsPaused();
+  error InvalidAmount();
+  error InvalidAmountAfterFee();
+  error InsufficientMAIBalance();
+  error WithdrawalAlreadyScheduled();
+  error NotWithinWithdrawalPeriod();
+  error NoWithdrawalScheduled();
+  error WithdrawalAlreadyExecutable();
+
   // Events
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
@@ -69,27 +79,27 @@ contract BeefyVaultWithdrawal {
   }
 
   modifier onlyOwner() {
-    require(msg.sender == owner, 'Caller is not the owner');
+    if (msg.sender != owner) revert CallerIsNotOwner();
     _;
   }
 
   modifier pausable() {
-    require(!paused, 'Contract is paused');
+    if (paused) revert ContractIsPaused();
     _;
   }
 
   // user deposits shares, withdraws stable
   function deposit(uint256 _amount) external pausable {
-    require(_amount >= minimumDepositFee && _amount <= maxDeposit, 'Invalid amount');
+    if (_amount < minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
 
     uint256 _fee = calculateDepositFee(_amount);
 
-    require(_amount > _fee, 'Invalid amount');
+    if (_amount <= _fee) revert InvalidAmount();
 
     uint256 _amountAfterFee = _amount - _fee;
     uint256 _amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * _amountAfterFee / 1e18;
 
-    require(IERC20(MAI_ADDRESS).balanceOf(address(this)) >= _amountOfUnderlying, 'Insufficient MAI balance');
+    if (IERC20(MAI_ADDRESS).balanceOf(address(this)) < _amountOfUnderlying) revert InsufficientMAIBalance();
 
     IERC20(gem).transferFrom(msg.sender, address(this), _amount);
     totalStableLiquidity += _amountOfUnderlying;
@@ -101,8 +111,8 @@ contract BeefyVaultWithdrawal {
   }
 
   function scheduleWithdraw(uint256 _amount) external pausable {
-    require(_amount >= minimumWithdrawalFee && _amount <= maxWithdraw, 'Invalid amount');
-    require(scheduledWithdrawalAmount[msg.sender] == 0, 'Withdrawal already scheduled');
+    if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
+    if (scheduledWithdrawalAmount[msg.sender] != 0) revert WithdrawalAlreadyScheduled();
 
     IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
     scheduledWithdrawalAmount[msg.sender] = _amount;
@@ -112,14 +122,14 @@ contract BeefyVaultWithdrawal {
   }
 
   function executeWithdrawal() external pausable {
-    require(isWithinWithdrawalPeriod(withdrawalEpoch[msg.sender]), 'Not within withdrawal period');
+    if (!isWithinWithdrawalPeriod(withdrawalEpoch[msg.sender])) revert NotWithinWithdrawalPeriod();
 
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
-    require(_amount <= totalStableLiquidity, 'Invalid amount');
+    if (_amount > totalStableLiquidity) revert InvalidAmount();
 
     uint256 _amountOfShares = _amount * 1e18 / IBeefy(gem).getPricePerFullShare();
     uint256 _fee = calculateWithdrawalFee(_amountOfShares);
-    require(_amountOfShares > _fee, 'Invalid amount after fee');
+    if (_amountOfShares <= _fee) revert InvalidAmountAfterFee();
 
     uint256 _amountOfSharesAfterFee = _amountOfShares - _fee;
     totalStableLiquidity -= _amount;
@@ -134,8 +144,8 @@ contract BeefyVaultWithdrawal {
   }
 
   function cancelWithdrawal() external pausable {
-    require(scheduledWithdrawalAmount[msg.sender] > 0, 'No withdrawal scheduled');
-    require(getCurrentEpoch() - withdrawalEpoch[msg.sender] < 3, 'Withdrawal already executable');
+    if (scheduledWithdrawalAmount[msg.sender] == 0) revert NoWithdrawalScheduled();
+    if (getCurrentEpoch() - withdrawalEpoch[msg.sender] >= 3) revert WithdrawalAlreadyExecutable();
 
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     scheduledWithdrawalAmount[msg.sender] = 0;
