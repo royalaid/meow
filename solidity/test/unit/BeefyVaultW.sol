@@ -10,19 +10,19 @@ import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet(address _owner) public {
     vm.prank(_owner);
-    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100, _user);
+    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
 
     assertEq(_beefyVaultWithdrawal.owner(), _owner);
   }
 
   function test_TokenSet(IERC20 _mooToken) public {
-    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100, _user);
+    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
 
     assertEq(address(_beefyVaultWithdrawal.gem()), address(_mooToken));
   }
 
   function test_BeefySet() public {
-    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100, _user);
+    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
 
     assertEq(address(_beefyVaultWithdrawal.underlying()), address(_maiToken));
   }

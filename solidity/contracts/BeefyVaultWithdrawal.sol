@@ -1,14 +1,14 @@
 pragma solidity 0.8.20;
 
 interface IERC20 {
-  function approve(address _spender, uint256 _amount) external returns (bool success);
-  function transfer(address _recipient, uint256 _amount) external returns (bool success);
-  function transferFrom(address _sender, address _recipient, uint256 _amount) external returns (bool success);
-  function balanceOf(address _account) external view returns (uint256 balance);
+  function approve(address _spender, uint256 _amount) external returns (bool _success);
+  function transfer(address _recipient, uint256 _amount) external returns (bool _success);
+  function transferFrom(address _sender, address _recipient, uint256 _amount) external returns (bool _success);
+  function balanceOf(address _account) external view returns (uint256 _balance);
 }
 
 interface IBeefy {
-  function getPricePerFullShare() external view returns (uint256 pricePerFullShare);
+  function getPricePerFullShare() external view returns (uint256 _pricePerFullShare);
 }
 
 contract BeefyVaultWithdrawal {
@@ -28,7 +28,6 @@ contract BeefyVaultWithdrawal {
   uint256 public totalFees;
   uint256 public accumulatedFees;
 
-  address public target;
   address public underlying;
   address public owner;
   address public gem;
@@ -42,11 +41,11 @@ contract BeefyVaultWithdrawal {
   // Events
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
-  event FeesUpdated(uint256 newDepositFee, uint256 newWithdrawalFee);
-  event MinimumFeesUpdated(uint256 newMinimumDepositFee, uint256 newMinimumWithdrawalFee);
-  event OwnerUpdated(address newOwner);
+  event FeesUpdated(uint256 _newDepositFee, uint256 _newWithdrawalFee);
+  event MinimumFeesUpdated(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee);
+  event OwnerUpdated(address _newOwner);
   event MAIRemoved(address indexed _user, uint256 _amount);
-  event FeesWithdrawn(address indexed _owner, uint256 feesEarned);
+  event FeesWithdrawn(address indexed _owner, uint256 _feesEarned);
   event PauseEvent(address _account, bool _paused);
   event WithdrawalCancelled(address indexed _user, uint256 _amount);
   event ScheduledWithdrawal(address indexed _user, uint256 _amount);
@@ -55,7 +54,7 @@ contract BeefyVaultWithdrawal {
   event MaxWithdrawUpdated(uint256 _maxWithdraw);
 
   // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
-  constructor(address _gem, address _underlying, uint256 _depositFee, uint256 _withdrawalFee, address _target) {
+  constructor(address _gem, address _underlying, uint256 _depositFee, uint256 _withdrawalFee) {
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
     minimumDepositFee = 1_000_000; //
@@ -66,7 +65,6 @@ contract BeefyVaultWithdrawal {
     maxWithdraw = 1e24; // 1 million ether
     underlying = _underlying;
     gem = _gem;
-    target = _target;
     owner = msg.sender;
   }
 
@@ -84,22 +82,22 @@ contract BeefyVaultWithdrawal {
   function deposit(uint256 _amount) external pausable {
     require(_amount >= minimumDepositFee && _amount <= maxDeposit, 'Invalid amount');
 
-    uint256 fee = calculateDepositFee(_amount);
+    uint256 _fee = calculateDepositFee(_amount);
 
-    require(_amount > fee, 'Invalid amount');
+    require(_amount > _fee, 'Invalid amount');
 
-    uint256 amountAfterFee = _amount - fee;
-    uint256 amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * amountAfterFee / 1e18;
+    uint256 _amountAfterFee = _amount - _fee;
+    uint256 _amountOfUnderlying = IBeefy(gem).getPricePerFullShare() * _amountAfterFee / 1e18;
 
-    require(IERC20(MAI_ADDRESS).balanceOf(address(this)) >= amountOfUnderlying, 'Insufficient MAI balance');
+    require(IERC20(MAI_ADDRESS).balanceOf(address(this)) >= _amountOfUnderlying, 'Insufficient MAI balance');
 
     IERC20(gem).transferFrom(msg.sender, address(this), _amount);
-    totalStableLiquidity += amountOfUnderlying;
-    accumulatedFees += fee;
+    totalStableLiquidity += _amountOfUnderlying;
+    accumulatedFees += _fee;
 
-    IERC20(MAI_ADDRESS).transfer(msg.sender, amountOfUnderlying);
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amountOfUnderlying);
 
-    emit Deposited(msg.sender, amountAfterFee);
+    emit Deposited(msg.sender, _amountAfterFee);
   }
 
   function scheduleWithdraw(uint256 _amount) external pausable {
@@ -119,20 +117,20 @@ contract BeefyVaultWithdrawal {
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     require(_amount <= totalStableLiquidity, 'Invalid amount');
 
-    uint256 amountOfShares = _amount * 1e18 / IBeefy(gem).getPricePerFullShare();
-    uint256 fee = calculateWithdrawalFee(amountOfShares);
-    require(amountOfShares > fee, 'Invalid amount after fee');
+    uint256 _amountOfShares = _amount * 1e18 / IBeefy(gem).getPricePerFullShare();
+    uint256 _fee = calculateWithdrawalFee(_amountOfShares);
+    require(_amountOfShares > _fee, 'Invalid amount after fee');
 
-    uint256 amountOfSharesAfterFee = amountOfShares - fee;
+    uint256 _amountOfSharesAfterFee = _amountOfShares - _fee;
     totalStableLiquidity -= _amount;
-    accumulatedFees += fee;
+    accumulatedFees += _fee;
 
     scheduledWithdrawalAmount[msg.sender] = 0;
     withdrawalEpoch[msg.sender] = 0;
 
-    IERC20(gem).transfer(msg.sender, amountOfSharesAfterFee);
+    IERC20(gem).transfer(msg.sender, _amountOfSharesAfterFee);
 
-    emit Withdrawn(msg.sender, amountOfSharesAfterFee);
+    emit Withdrawn(msg.sender, _amountOfSharesAfterFee);
   }
 
   function cancelWithdrawal() external pausable {
@@ -147,23 +145,23 @@ contract BeefyVaultWithdrawal {
     emit WithdrawalCancelled(msg.sender, _amount);
   }
 
-  function getCurrentEpoch() public view returns (uint256 epoch) {
-    epoch = block.timestamp / 1 days;
+  function getCurrentEpoch() public view returns (uint256 _epoch) {
+    _epoch = block.timestamp / 1 days;
   }
 
-  function isWithinWithdrawalPeriod(uint256 _epoch) public view returns (bool withinPeriod) {
-    uint256 epochStartTime = _epoch * 1 days;
-    withinPeriod = block.timestamp >= epochStartTime && block.timestamp <= epochStartTime + 12 hours;
+  function isWithinWithdrawalPeriod(uint256 _epoch) public view returns (bool _withinPeriod) {
+    uint256 _epochStartTime = _epoch * 1 days;
+    _withinPeriod = block.timestamp >= _epochStartTime && block.timestamp <= _epochStartTime + 12 hours;
   }
 
-  function calculateDepositFee(uint256 _amount) public view returns (uint256 fee) {
-    fee = _amount * depositFee / 10_000;
-    fee = fee < minimumDepositFee ? minimumDepositFee : fee;
+  function calculateDepositFee(uint256 _amount) public view returns (uint256 _fee) {
+    _fee = _amount * depositFee / 10_000;
+    _fee = _fee < minimumDepositFee ? minimumDepositFee : _fee;
   }
 
-  function calculateWithdrawalFee(uint256 _amount) public view returns (uint256 fee) {
-    fee = _amount * withdrawalFee / 10_000;
-    fee = fee < minimumWithdrawalFee ? minimumWithdrawalFee : fee;
+  function calculateWithdrawalFee(uint256 _amount) public view returns (uint256 _fee) {
+    _fee = _amount * withdrawalFee / 10_000;
+    _fee = _fee < minimumWithdrawalFee ? minimumWithdrawalFee : _fee;
   }
 
   function updateFees(uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {

@@ -22,6 +22,6 @@ contract BeefyIntegrationBase is Test {
     //vm.createSelectFork(vm.rpcUrl('base'), _FORK_BLOCK);
     vm.prank(_owner);
     _beefyVault = IBeefy(address(_mooToken));
-    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_beefyVault), 100, 100, _owner);
+    _beefyVaultWithdrawal = new BeefyVaultWithdrawal(address(_mooToken), address(_beefyVault), 100, 100);
   }
 }
