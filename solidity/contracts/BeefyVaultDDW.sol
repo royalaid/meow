@@ -129,11 +129,14 @@ contract BeefyVaultDelayWithdrawal {
     IERC20.approve(_gem, MAX_INT);
   }
 
-  // user deposits tokens, withdraws stable
+  // user deposits tokens (6 decimals), withdraws stable
   function deposit(uint256 _amount) external pausable {
     IERC20(underlying).transferFrom(msg.sender, _amount);
+    uint256 fee = calculateFee(_amount, true);
+    _amount = _amount-fee;
     totalStableLiquidity+=_amount;
     IBeefy(gem).depositAll();
+    
     IERC20(MAI_ADDRESS).transfer(msg.sender, _amount * (10**(decimalDifference)));
     emit Deposited(msg.sender, _amount);
   }
@@ -146,14 +149,13 @@ contract BeefyVaultDelayWithdrawal {
   }
 
   function withdraw() external pausable {
-
-    if(withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender] || block.timestamp > withdrawalEpoch[msg.sender] + 12 hours) {
+    if(withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
         revert WithdrawalNotAvailable();
     }
     withdrawalEpoch=0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     scheduledWithdrawalAmount=0;
-    
+
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
@@ -161,10 +163,21 @@ contract BeefyVaultDelayWithdrawal {
 
     uint256 towithdraw = _amount / (10**decimalDifference);
     totalStableLiquidity-=towithdraw;
+    uint256 fee = calculateFee(towithdraw, false);
 
-    IERC20(underlying).transfer(_recipient, towithdraw);
+    IERC20(underlying).transfer(_recipient, (towithdraw-fee));
 
     emit Withdrawn(msg.sender, _amount);
+  }
+
+  function calculateFee(uint256 _amount, bool _deposit) public view returns (uint256 _fee) {
+    if(_deposit){
+      _fee = _amount * depositFee / 10_000;
+      _fee = _fee < minimumWithdrawalFee ? minimumWithdrawalFee : _fee;
+    } else {
+      _fee = _amount * withdrawalFee / 10_000;
+      _fee = _fee < minimumWithdrawalFee ? minimumWithdrawalFee : _fee;
+    }
   }
 
   function claimFees() external onlyOwner() {
