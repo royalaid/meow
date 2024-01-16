@@ -53,7 +53,8 @@ contract PSMVaultGeneric {
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
     minimumDepositFee = 1_000_000; //
-    minimumWithdrawalFee = 1_000_000; //
+    minimumWithdrawalFee = 1_000_000;
+    //
     underlying = _underlying;
     gem = _gem;
     target = _target;
