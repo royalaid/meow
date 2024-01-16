@@ -129,20 +129,31 @@ contract BeefyVaultDelayWithdrawal {
     IERC20.approve(_gem, MAX_INT);
   }
 
-  // assuming no fees for now
-
   // user deposits tokens, withdraws stable
   function deposit(uint256 _amount) external pausable {
     IERC20(underlying).transferFrom(msg.sender, _amount);
+    totalStableLiquidity+=_amount;
     IBeefy(gem).depositAll();
     IERC20(MAI_ADDRESS).transfer(msg.sender, _amount * (10**(decimalDifference)));
-    totalStableLiquidity+=_amount;
     emit Deposited(msg.sender, _amount);
   }
 
-  function withdraw(uint256 _amount) external pausable {
-    // amount is is MAI given
+  function scheduleWithdraw(uint256 _amount) external pausable {
     IERC20(MAI_ADDRESS).transferFrom(msg.sender, _amount);
+    scheduledWithdrawalAmount[msg.sender] = _amount;
+    withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
+    emit WithdrawalScheduled(msg.sender, _amount);
+  }
+
+  function withdraw() external pausable {
+
+    if(withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender] || block.timestamp > withdrawalEpoch[msg.sender] + 12 hours) {
+        revert WithdrawalNotAvailable();
+    }
+    withdrawalEpoch=0;
+    uint256 _amount = scheduledWithdrawalAmount[msg.sender];
+    scheduledWithdrawalAmount=0;
+    
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
@@ -150,7 +161,7 @@ contract BeefyVaultDelayWithdrawal {
 
     uint256 towithdraw = _amount / (10**decimalDifference);
     totalStableLiquidity-=towithdraw;
-    
+
     IERC20(underlying).transfer(_recipient, towithdraw);
 
     emit Withdrawn(msg.sender, _amount);
@@ -168,7 +179,6 @@ contract BeefyVaultDelayWithdrawal {
         beef.withdraw(shares);
         IERC20(underlying).transfer(msg.sender, _amount / (10**decimalDifference));
     }
-
   }
 
   function togglePause(bool _paused) external onlyOwner {
