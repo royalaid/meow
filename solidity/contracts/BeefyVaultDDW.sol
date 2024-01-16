@@ -79,6 +79,7 @@ contract BeefyVaultDelayWithdrawal {
   error NoWithdrawalScheduled();
   error WithdrawalAlreadyExecutable();
   error AlreadyInitialized();
+  error NewOwnerCannotBeZeroAddress();
 
   // Events
   event Deposited(address indexed _user, uint256 _amount);
@@ -94,7 +95,7 @@ contract BeefyVaultDelayWithdrawal {
   event WithdrawalScheduled(address indexed _user, uint256 _amount);
   event MaxDepositUpdated(uint256 _maxDeposit);
   event MaxWithdrawUpdated(uint256 _maxWithdraw);
-
+  
   // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
   constructor() {
     owner = msg.sender;
@@ -197,5 +198,11 @@ contract BeefyVaultDelayWithdrawal {
   function togglePause(bool _paused) external onlyOwner {
     paused = _paused;
     emit PauseEvent(msg.sender, _paused);
+  }
+
+  function transferOwnership(address newOwner) external onlyOwner {
+    if (newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
+    owner = newOwner;
+    emit OwnerUpdated(newOwner);
   }
 }
