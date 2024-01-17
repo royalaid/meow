@@ -34,13 +34,6 @@ interface IBeefy {
   function want() external view returns (address);
   function withdraw(uint256 _shares) external;
   function withdrawAll() external;
-
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-  event Initialized(uint8 version);
-  event NewStratCandidate(address implementation);
-  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event UpgradeStrat(address implementation);
 }
 
 contract BeefyVaultDelayWithdrawal {
@@ -153,20 +146,20 @@ contract BeefyVaultDelayWithdrawal {
     if(withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
         revert WithdrawalNotAvailable();
     }
-    withdrawalEpoch=0;
+    withdrawalEpoch[msg.sender]=0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
-    scheduledWithdrawalAmount=0;
+    scheduledWithdrawalAmount[msg.sender]=0;
 
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
     beef.withdraw(shares);
 
-    uint256 towithdraw = _amount / (10**decimalDifference);
-    totalStableLiquidity-=towithdraw;
-    uint256 fee = calculateFee(towithdraw, false);
+    uint256 toWithdraw = _amount / (10**decimalDifference);
+    totalStableLiquidity-=toWithdraw;
+    uint256 fee = calculateFee(toWithdraw, false);
 
-    IERC20(underlying).transfer(_recipient, (towithdraw-fee));
+    IERC20(underlying).transfer(_recipient, (toWithdraw-fee));
 
     emit Withdrawn(msg.sender, _amount);
   }
@@ -185,11 +178,11 @@ contract BeefyVaultDelayWithdrawal {
     IBeefy beef = IBeefy(gem);
     // get total balance in underlying
     uint256 shares = beef.balanceOf(address(this));
-    uint256 want = beef.getPricePerFullShare() * shares / (10**decimalDifference);
-    if(want>totalStableLiquidity){
-        uint256 fees = (want - totalStableLiquidity);
+    uint256 totalStored = beef.getPricePerFullShare() * shares / (10**decimalDifference);
+    if(totalStored>totalStableLiquidity){
+        uint256 fees = (totalStored - totalStableLiquidity);
         // convert back to shares i guess
-        uint256 shares = want * 1e18 / beef.getPricePerFullShare();
+        uint256 shares = totalStored * 1e18 / beef.getPricePerFullShare();
         beef.withdraw(shares);
         IERC20(underlying).transfer(msg.sender, _amount / (10**decimalDifference));
     }
