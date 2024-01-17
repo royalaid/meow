@@ -73,7 +73,8 @@ contract BeefyVaultDelayWithdrawal {
   error WithdrawalAlreadyExecutable();
   error AlreadyInitialized();
   error NewOwnerCannotBeZeroAddress();
-
+  error WithdrawalAlreadyScheduled();
+  
   // Events
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
@@ -136,6 +137,9 @@ contract BeefyVaultDelayWithdrawal {
   }
 
   function scheduleWithdraw(uint256 _amount) external pausable {
+    if(withdrawalEpoch[msg.sender]!=0){
+        revert WithdrawalAlreadyScheduled();
+    }
     IERC20(MAI_ADDRESS).transferFrom(msg.sender, _amount);
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
