@@ -73,7 +73,7 @@ contract BeefyVaultDelayWithdrawal {
   error WithdrawalAlreadyExecutable();
   error AlreadyInitialized();
   error NewOwnerCannotBeZeroAddress();
-  error WithdrawalAlreadyScheduled();
+  error WithdrawalNotAvailable();
   
   // Events
   event Deposited(address indexed _user, uint256 _amount);
@@ -125,12 +125,12 @@ contract BeefyVaultDelayWithdrawal {
   }
 
   function approveBeef() public {
-    IERC20.approve(_gem, MAX_INT);
+    IERC20(gem).approve(underlying, MAX_INT);
   }
 
   // user deposits tokens (6 decimals), withdraws stable
   function deposit(uint256 _amount) external pausable {
-    IERC20(underlying).transferFrom(msg.sender, _amount);
+    IERC20(underlying).transferFrom(msg.sender, address(this), _amount);
     uint256 fee = calculateFee(_amount, true);
     _amount = _amount-fee;
     totalStableLiquidity+=_amount;
@@ -144,7 +144,7 @@ contract BeefyVaultDelayWithdrawal {
     if(withdrawalEpoch[msg.sender]!=0){
         revert WithdrawalAlreadyScheduled();
     }
-    IERC20(MAI_ADDRESS).transferFrom(msg.sender, _amount);
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
@@ -167,7 +167,7 @@ contract BeefyVaultDelayWithdrawal {
     totalStableLiquidity-=toWithdraw;
     uint256 fee = calculateFee(toWithdraw, false);
 
-    IERC20(underlying).transfer(_recipient, (toWithdraw-fee));
+    IERC20(underlying).transfer(msg.sender, (toWithdraw-fee));
 
     emit Withdrawn(msg.sender, _amount);
   }
@@ -190,8 +190,8 @@ contract BeefyVaultDelayWithdrawal {
     if(totalStored>totalStableLiquidity){
         uint256 fees = (totalStored - totalStableLiquidity); // in USDC
         // convert back to shares i guess
-        uint256 shares = fees * beef.getPricePerFullShare() / 1e18;
-        beef.withdraw(shares);
+        uint256 feeShares = fees * beef.getPricePerFullShare() / 1e18;
+        beef.withdraw(feeShares);
         IERC20(underlying).transfer(msg.sender, fees / (10**decimalDifference));
     }
   }
