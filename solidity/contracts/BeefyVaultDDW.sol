@@ -121,6 +121,10 @@ contract BeefyVaultDelayWithdrawal {
     underlying = beef.want();
     decimalDifference = uint256(beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
+    approveBeef();
+  }
+
+  function approveBeef() public {
     IERC20.approve(_gem, MAX_INT);
   }
 
@@ -184,19 +188,20 @@ contract BeefyVaultDelayWithdrawal {
     uint256 shares = beef.balanceOf(address(this));
     uint256 totalStored = beef.getPricePerFullShare() * shares / (10**decimalDifference);
     if(totalStored>totalStableLiquidity){
-        uint256 fees = (totalStored - totalStableLiquidity);
+        uint256 fees = (totalStored - totalStableLiquidity); // in USDC
         // convert back to shares i guess
-        uint256 shares = totalStored * 1e18 / beef.getPricePerFullShare();
+        uint256 shares = fees * beef.getPricePerFullShare() / 1e18;
         beef.withdraw(shares);
-        IERC20(underlying).transfer(msg.sender, _amount / (10**decimalDifference));
+        IERC20(underlying).transfer(msg.sender, fees / (10**decimalDifference));
     }
   }
-
+  // TODO: pause toggle should be function-based
   function togglePause(bool _paused) external onlyOwner {
     paused = _paused;
     emit PauseEvent(msg.sender, _paused);
   }
 
+  // TODO: Use nomination-transfership
   function transferOwnership(address newOwner) external onlyOwner {
     if (newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
     owner = newOwner;
