@@ -125,7 +125,7 @@ contract BeefyVaultDelayWithdrawal {
   }
 
   function approveBeef() public {
-    IERC20(gem).approve(underlying, MAX_INT);
+    IERC20(underlying).approve(gem, MAX_INT);
   }
 
   // user deposits tokens (6 decimals), withdraws stable
@@ -144,10 +144,10 @@ contract BeefyVaultDelayWithdrawal {
     if(withdrawalEpoch[msg.sender]!=0){
         revert WithdrawalAlreadyScheduled();
     }
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
   }
 
   function withdraw() external pausable {
@@ -191,6 +191,7 @@ contract BeefyVaultDelayWithdrawal {
         uint256 fees = (totalStored - totalStableLiquidity); // in USDC
         // convert back to shares i guess
         uint256 feeShares = fees * beef.getPricePerFullShare() / 1e18;
+        // afaik this is off bc 6 decimals
         beef.withdraw(feeShares);
         IERC20(underlying).transfer(msg.sender, fees / (10**decimalDifference));
     }
