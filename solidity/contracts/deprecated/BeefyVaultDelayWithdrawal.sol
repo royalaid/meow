@@ -11,7 +11,7 @@ interface IBeefy {
   function getPricePerFullShare() external view returns (uint256 _pricePerFullShare);
 }
 
-contract BeefyVaultDelayWithdrawal {
+contract BeefyVaultDelayWithdrawal4 {
   uint256 public constant MAX_INT =
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
   address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;

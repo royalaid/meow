@@ -1,9 +1,42 @@
-pragma solidity 0.8.19;
+pragma solidity 0.8.20;
 
-import '../interfaces/IBeefy.sol';
-import '../interfaces/IERC20.sol';
+interface IERC20 {
+  function approve(address _spender, uint256 _amount) external returns (bool _success);
+  function transfer(address _recipient, uint256 _amount) external returns (bool _success);
+  function transferFrom(address _sender, address _recipient, uint256 _amount) external returns (bool _success);
+  function balanceOf(address _account) external view returns (uint256 _balance);
+  function decimals() external view returns (uint8 decimals);
+}
 
-contract BeefyVaultPSM {
+interface IBeefy {
+  function getPricePerFullShare() external view returns (uint256 _pricePerFullShare);
+  function allowance(address owner, address spender) external view returns (uint256);
+  function approvalDelay() external view returns (uint256);
+  function approve(address spender, uint256 amount) external returns (bool);
+  function available() external view returns (uint256);
+  function balance() external view returns (uint256);
+  function balanceOf(address account) external view returns (uint256);
+  function decimals() external view returns (uint8);
+  function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool);
+  function deposit(uint256 _amount) external;
+  function depositAll() external;
+  function inCaseTokensGetStuck(address _token) external;
+  function increaseAllowance(address spender, uint256 addedValue) external returns (bool);
+  function initialize(address _strategy, string calldata _name, string calldata _symbol, uint256 _approvalDelay) external;
+  function name() external view returns (string memory);
+  function owner() external view returns (address);
+  function proposeStrat(address _implementation) external;
+  function renounceOwnership() external;
+  function stratCandidate() external view returns (address implementation, uint256 proposedTime);
+  function strategy() external view returns (address);
+  function symbol() external view returns (string memory);
+  function totalSupply() external view returns (uint256);
+  function want() external view returns (address);
+  function withdraw(uint256 _shares) external;
+  function withdrawAll() external;
+}
+
+contract BeefyVaultDelayWithdrawaldep {
   uint256 public constant MAX_INT =
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
   address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
@@ -46,6 +79,7 @@ contract BeefyVaultPSM {
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
   event FeesUpdated(uint256 _newDepositFee, uint256 _newWithdrawalFee);
+  event MinimumFeesUpdated(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee);
   event OwnerUpdated(address _newOwner);
   event MAIRemoved(address indexed _user, uint256 _amount);
   event FeesWithdrawn(address indexed _owner, uint256 _feesEarned);
@@ -72,12 +106,12 @@ contract BeefyVaultPSM {
     _;
   }
 
-  function initialize(address _gem, uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
+  function initialize(address _gem, uint256 _depositFeeBP, uint256 _withdrawalFeeBP) external onlyOwner {
     if(initialized) {
         revert AlreadyInitialized();
     }
-    depositFee = _depositFee;
-    withdrawalFee = _withdrawalFee;
+    depositFee = _depositFeeBP;
+    withdrawalFee = _withdrawalFeeBP;
     minimumDepositFee = 1_000_000; 
     minimumWithdrawalFee = 1_000_000;
 
@@ -181,7 +215,7 @@ contract BeefyVaultPSM {
     mai.transfer(msg.sender,mai.balanceOf(address(this)));
   }
 
-  function updateMinimumFees(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee) external onlyOwner {
+  function updateMinimumFees(uint256 uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee) external onlyOwner {
       minimumDepositFee = _newMinimumDepositFee;
       minimumWithdrawalFee = _newMinimumWithdrawalFee;
       emit MinimumFeesUpdated(_newMinimumDepositFee, _newMinimumWithdrawalFee);
