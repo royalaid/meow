@@ -1,7 +1,8 @@
-pragma solidity 0.8.19;
+pragma solidity 0.8.20;
 
 import '../interfaces/IBeefy.sol';
 import '../interfaces/IERC20.sol';
+import 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -41,7 +42,7 @@ contract BeefyVaultPSM {
   error AlreadyInitialized();
   error NewOwnerCannotBeZeroAddress();
   error WithdrawalNotAvailable();
-  
+
   // Events
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
@@ -63,6 +64,8 @@ contract BeefyVaultPSM {
   }
 
   modifier onlyOwner() {
+    console.log('msg.sender:', msg.sender);
+    console.log('owner:', owner);
     if (msg.sender != owner) revert CallerIsNotOwner();
     _;
   }
@@ -73,21 +76,24 @@ contract BeefyVaultPSM {
   }
 
   function initialize(address _gem, uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
-    if(initialized) {
-        revert AlreadyInitialized();
+    console.log('Initializing BeefyVaultPSM');
+    if (initialized) {
+      console.log('Already initialized');
+      revert AlreadyInitialized();
     }
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    minimumDepositFee = 1_000_000; 
+    minimumDepositFee = 1_000_000;
     minimumWithdrawalFee = 1_000_000;
 
     IBeefy beef = IBeefy(_gem);
 
-    maxDeposit = 1e24;  // 1 million ether
+    maxDeposit = 1e24; // 1 million ether
     maxWithdraw = 1e24; // 1 million ether
     underlying = beef.want();
     decimalDifference = uint256(beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
+    console.log('Gem:', gem);
     approveBeef();
   }
 
@@ -99,17 +105,17 @@ contract BeefyVaultPSM {
   function deposit(uint256 _amount) external pausable {
     IERC20(underlying).transferFrom(msg.sender, address(this), _amount);
     uint256 fee = calculateFee(_amount, true);
-    _amount = _amount-fee;
-    totalStableLiquidity+=_amount;
+    _amount = _amount - fee;
+    totalStableLiquidity += _amount;
     IBeefy(gem).depositAll();
-    
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount * (10**(decimalDifference)));
+
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount * (10 ** (decimalDifference)));
     emit Deposited(msg.sender, _amount);
   }
 
   function scheduleWithdraw(uint256 _amount) external pausable {
-    if(withdrawalEpoch[msg.sender]!=0){
-        revert WithdrawalAlreadyScheduled();
+    if (withdrawalEpoch[msg.sender] != 0) {
+      revert WithdrawalAlreadyScheduled();
     }
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
@@ -118,29 +124,29 @@ contract BeefyVaultPSM {
   }
 
   function withdraw() external pausable {
-    if(withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
-        revert WithdrawalNotAvailable();
+    if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
+      revert WithdrawalNotAvailable();
     }
-    withdrawalEpoch[msg.sender]=0;
+    withdrawalEpoch[msg.sender] = 0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
-    scheduledWithdrawalAmount[msg.sender]=0;
+    scheduledWithdrawalAmount[msg.sender] = 0;
 
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
     beef.withdraw(shares);
 
-    uint256 toWithdraw = _amount / (10**decimalDifference);
-    totalStableLiquidity-=toWithdraw;
+    uint256 toWithdraw = _amount / (10 ** decimalDifference);
+    totalStableLiquidity -= toWithdraw;
     uint256 fee = calculateFee(toWithdraw, false);
 
-    IERC20(underlying).transfer(msg.sender, (toWithdraw-fee));
+    IERC20(underlying).transfer(msg.sender, (toWithdraw - fee));
 
     emit Withdrawn(msg.sender, _amount);
   }
 
   function calculateFee(uint256 _amount, bool _deposit) public view returns (uint256 _fee) {
-    if(_deposit){
+    if (_deposit) {
       _fee = _amount * depositFee / 10_000;
       _fee = _fee < minimumDepositFee ? minimumDepositFee : _fee;
     } else {
@@ -149,21 +155,22 @@ contract BeefyVaultPSM {
     }
   }
 
-  function claimFees() external onlyOwner() {
+  function claimFees() external onlyOwner {
     IBeefy beef = IBeefy(gem);
     // get total balance in underlying
     uint256 shares = beef.balanceOf(address(this));
-    uint256 totalStored = beef.getPricePerFullShare() * shares / (10**decimalDifference);
-    if(totalStored>totalStableLiquidity){
-        uint256 fees = (totalStored - totalStableLiquidity); // in USDC
-        // convert back to shares i guess
-        uint256 feeShares = fees * beef.getPricePerFullShare() / 1e18;
-        // afaik this is off bc 6 decimals
-        beef.withdraw(feeShares);
-        IERC20(underlying).transfer(msg.sender, fees / (10**decimalDifference));
+    uint256 totalStored = beef.getPricePerFullShare() * shares / (10 ** decimalDifference);
+    if (totalStored > totalStableLiquidity) {
+      uint256 fees = (totalStored - totalStableLiquidity); // in USDC
+      // convert back to shares i guess
+      uint256 feeShares = fees * beef.getPricePerFullShare() / 1e18;
+      // afaik this is off bc 6 decimals
+      beef.withdraw(feeShares);
+      IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
     }
   }
   // TODO: pause toggle should be function-based
+
   function togglePause(bool _paused) external onlyOwner {
     paused = _paused;
     emit PauseEvent(msg.sender, _paused);
@@ -176,14 +183,14 @@ contract BeefyVaultPSM {
     emit OwnerUpdated(newOwner);
   }
 
-  function withdrawMAI() external onlyOwner() {
+  function withdrawMAI() external onlyOwner {
     IERC20 mai = IERC20(MAI_ADDRESS);
-    mai.transfer(msg.sender,mai.balanceOf(address(this)));
+    mai.transfer(msg.sender, mai.balanceOf(address(this)));
   }
 
   function updateMinimumFees(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee) external onlyOwner {
-      minimumDepositFee = _newMinimumDepositFee;
-      minimumWithdrawalFee = _newMinimumWithdrawalFee;
-      emit MinimumFeesUpdated(_newMinimumDepositFee, _newMinimumWithdrawalFee);
+    minimumDepositFee = _newMinimumDepositFee;
+    minimumWithdrawalFee = _newMinimumWithdrawalFee;
+    emit MinimumFeesUpdated(_newMinimumDepositFee, _newMinimumWithdrawalFee);
   }
 }

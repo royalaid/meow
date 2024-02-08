@@ -4,7 +4,9 @@ pragma solidity =0.8.20;
 import {IERC20} from 'isolmate/interfaces/tokens/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
 
-import {BeefyVaultDelayWithdrawal, IBeefy} from 'contracts/BeefyVaultDelayWithdrawal.sol';
+import {BeefyVaultPSM} from 'contracts/BeefyVaultDDW.sol';
+import {IBeefy} from '../../interfaces/IBeefy.sol';
+import 'forge-std/console.sol';
 
 contract BeefyIntegrationBase is Test {
   uint256 internal constant _FORK_BLOCK = 8_420_622;
@@ -16,12 +18,16 @@ contract BeefyIntegrationBase is Test {
   IERC20 internal _maiToken = IERC20(0xbf1aeA8670D2528E08334083616dD9C5F3B087aE);
 
   IBeefy internal _beefyVault;
-  BeefyVaultDelayWithdrawal internal _beefyVaultWithdrawal;
+  BeefyVaultPSM internal _beefyVaultWithdrawal;
 
   function setUp() public {
-    //vm.createSelectFork(vm.rpcUrl('base'), _FORK_BLOCK);
-    vm.prank(_owner);
+    vm.createSelectFork(vm.rpcUrl('base'), _FORK_BLOCK);
+    // vm.startHoax(_owner);
     _beefyVault = IBeefy(address(_mooToken));
-    _beefyVaultWithdrawal = new BeefyVaultDelayWithdrawal(address(_mooToken), address(_beefyVault), 100, 100);
+    _beefyVaultWithdrawal = new BeefyVaultPSM();
+    console.log('BeefyVaultWithdrawal address:', address(_beefyVaultWithdrawal));
+    console.log('owner:', _beefyVaultWithdrawal.owner());
+    console.log('prank:', _owner);
+    _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
   }
 }

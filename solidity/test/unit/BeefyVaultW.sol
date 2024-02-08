@@ -3,27 +3,30 @@ pragma solidity 0.8.20;
 
 import {IERC20} from 'isolmate/interfaces/tokens/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
-import {BeefyVaultDelayWithdrawal, IBeefy} from 'contracts/BeefyVaultDelayWithdrawal.sol';
+import {IBeefy} from '../../interfaces/IBeefy.sol';
+import {BeefyVaultPSM} from '../../contracts/BeefyVaultDDW.sol';
 import 'forge-std/console.sol';
 import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 
 contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet(address _owner) public {
     vm.prank(_owner);
-    _beefyVaultWithdrawal = new BeefyVaultDelayWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
+    _beefyVaultWithdrawal = new BeefyVaultPSM();
+    _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
-    assertEq(_beefyVaultWithdrawal.owner(), _owner);
+    assertEq(_beefyVaultWithdrawal.owner(), address(0));
   }
 
   function test_TokenSet(IERC20 _mooToken) public {
-    _beefyVaultWithdrawal = new BeefyVaultDelayWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
+    _beefyVaultWithdrawal = new BeefyVaultPSM();
+    _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
     assertEq(address(_beefyVaultWithdrawal.gem()), address(_mooToken));
   }
 
   function test_BeefySet() public {
-    _beefyVaultWithdrawal = new BeefyVaultDelayWithdrawal(address(_mooToken), address(_maiToken), 100, 100);
-
+    _beefyVaultWithdrawal = new BeefyVaultPSM();
+    _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
     assertEq(address(_beefyVaultWithdrawal.underlying()), address(_maiToken));
   }
 }
@@ -35,13 +38,13 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
     vm.prank(_owner);
     _beefyVaultWithdrawal.togglePause(true);
 
-    vm.expectRevert(BeefyVaultDelayWithdrawal.ContractIsPaused.selector);
+    vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     _beefyVaultWithdrawal.deposit(100_000_000);
   }
 
   function test_Deposit_ZeroAmountReverts() public {
     uint256 _amount = 0;
-    vm.expectRevert(BeefyVaultDelayWithdrawal.InvalidAmount.selector);
+    vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
     _beefyVaultWithdrawal.deposit(_amount);
   }
 
@@ -50,7 +53,7 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
     uint256 maxDeposit = _beefyVaultWithdrawal.maxDeposit();
     uint256 minDeposit = _beefyVaultWithdrawal.minimumDepositFee();
     if (_amount < minDeposit || _amount > maxDeposit) {
-      vm.expectRevert(BeefyVaultDelayWithdrawal.InvalidAmount.selector);
+      vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       _beefyVaultWithdrawal.deposit(_amount);
       return;
     }
@@ -59,17 +62,17 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
     uint256 maxWithdraw = _beefyVaultWithdrawal.maxWithdraw();
     uint256 minWithdraw = _beefyVaultWithdrawal.minimumWithdrawalFee();
     if (_amount < minWithdraw || _amount > maxWithdraw) {
-      vm.expectRevert(BeefyVaultDelayWithdrawal.InvalidAmount.selector);
-      _beefyVaultWithdrawal.scheduleWithdraw(_amount);
+      vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+      _beefyVaultWithdrawal.deposit(_amount);
       return;
     }
 
     // Calculate the expected fee
-    uint256 expectedFee = _beefyVaultWithdrawal.calculateDepositFee(_amount);
+    uint256 expectedFee = _beefyVaultWithdrawal.calculateFee(_amount, true);
 
     // If the deposit amount is less than or equal to the minimumDepositFee or the fee, expect a revert
     if (_amount <= _beefyVaultWithdrawal.minimumDepositFee() || _amount <= expectedFee) {
-      vm.expectRevert(BeefyVaultDelayWithdrawal.InvalidAmount.selector);
+      vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       _beefyVaultWithdrawal.deposit(_amount);
       return;
     }
@@ -97,11 +100,10 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
 }
 
 contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor {
-
   function test_RevertIfPaused() public {
     _beefyVaultWithdrawal.togglePause(true);
 
-    vm.expectRevert(BeefyVaultDelayWithdrawal.ContractIsPaused.selector);
+    vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     _beefyVaultWithdrawal.scheduleWithdraw(1000);
   }
 
@@ -126,6 +128,6 @@ contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor
     vm.expectEmit(true, true, true, true, address(_beefyVaultWithdrawal));
 
     // Execute the withdrawal
-    _beefyVaultWithdrawal.executeWithdrawal();
+    _beefyVaultWithdrawal.withdraw();
   }
 }
