@@ -10,7 +10,6 @@ import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 
 contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet(address _owner) public {
-    vm.prank(_owner);
     _beefyVaultWithdrawal = new BeefyVaultPSM();
     _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
@@ -35,9 +34,7 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
   event Deposited(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
-    vm.prank(_owner);
     _beefyVaultWithdrawal.togglePause(true);
-
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     _beefyVaultWithdrawal.deposit(100_000_000);
   }
@@ -81,10 +78,10 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
     uint256 initialMaiBalance = _maiToken.balanceOf(_user);
 
     // Expect the Deposited event to be emitted with the correct parameters
-    vm.expectEmit(true, true, true, true, address(_beefyVaultWithdrawal));
+    vm.expectEmit(true, false, false, true, address(_beefyVaultWithdrawal));
     emit Deposited(_user, _amount);
 
-    vm.prank(_user);
+    vm.startPrank(_user);
     _beefyVaultWithdrawal.deposit(_amount);
 
     uint256 finalMooBalance = _mooToken.balanceOf(address(_beefyVaultWithdrawal));
@@ -100,6 +97,8 @@ contract UnitBeefyVaultWithdrawalDeposit is UnitBeefyVaultWithdrawalConstructor 
 }
 
 contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor {
+  event Withdrawn(address indexed user, uint256 amount);
+
   function test_RevertIfPaused() public {
     _beefyVaultWithdrawal.togglePause(true);
 
@@ -109,8 +108,20 @@ contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor
 
   function test_DepositAndWithdraw(uint256 _depositAmount, uint256 _withdrawAmount) public {
     // Deposit first to ensure there are tokens to withdraw
-    _beefyVaultWithdrawal.deposit(_depositAmount);
+    _usdbcToken.approve(address(_beefyVaultWithdrawal), _depositAmount);
+    console.log('Deposit amount:', _depositAmount);
+    console.log('maxDeposit:', _beefyVaultWithdrawal.maxDeposit());
+    console.log('minimumDepositFee:', _beefyVaultWithdrawal.minimumDepositFee());
 
+    if (
+      _depositAmount < _beefyVaultWithdrawal.minimumDepositFee() || _depositAmount > _beefyVaultWithdrawal.maxDeposit()
+    ) {
+      vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+      _beefyVaultWithdrawal.deposit(_depositAmount);
+      return;
+    } else {
+      _beefyVaultWithdrawal.deposit(_depositAmount);
+    }
     // Schedule the withdrawal
     _beefyVaultWithdrawal.scheduleWithdraw(_withdrawAmount);
 
@@ -125,7 +136,8 @@ contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor
     );
 
     // Expect the Withdrawn event to be emitted with the correct parameters
-    vm.expectEmit(true, true, true, true, address(_beefyVaultWithdrawal));
+    vm.expectEmit(true, false, false, true, address(_beefyVaultWithdrawal));
+    emit Withdrawn(_user, _withdrawAmount);
 
     // Execute the withdrawal
     _beefyVaultWithdrawal.withdraw();

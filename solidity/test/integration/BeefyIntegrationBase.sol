@@ -15,6 +15,7 @@ contract BeefyIntegrationBase is Test {
   address internal _owner = makeAddr('owner');
   address internal _beefyWhale = 0x008a74d96d799b0fcfae8462BfFF8C37C7ccc611;
   IERC20 internal _mooToken = IERC20(0xD7803d3Bf95517D204CFc6211678cAb223aC4c48);
+  IERC20 internal _usdbcToken = IERC20(0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA);
   IERC20 internal _maiToken = IERC20(0xbf1aeA8670D2528E08334083616dD9C5F3B087aE);
 
   IBeefy internal _beefyVault;
@@ -22,12 +23,14 @@ contract BeefyIntegrationBase is Test {
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('base'), _FORK_BLOCK);
-    // vm.startHoax(_owner);
+    vm.startPrank(_owner);
+    deal(address(_usdbcToken), _owner, 100_000_000 * 10 ** 6);
     _beefyVault = IBeefy(address(_mooToken));
     _beefyVaultWithdrawal = new BeefyVaultPSM();
     console.log('BeefyVaultWithdrawal address:', address(_beefyVaultWithdrawal));
     console.log('owner:', _beefyVaultWithdrawal.owner());
     console.log('prank:', _owner);
     _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
+    _beefyVaultWithdrawal.approveBeef();
   }
 }
