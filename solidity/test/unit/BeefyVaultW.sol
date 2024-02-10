@@ -16,8 +16,9 @@ contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
     assertEq(_beefyVaultWithdrawal.owner(), address(0));
   }
 
-  function test_TokenSet(IERC20 _mooToken) public {
+  function test_TokenSet() public {
     _beefyVaultWithdrawal = new BeefyVaultPSM();
+    address _mooToken = 0xD7803d3Bf95517D204CFc6211678cAb223aC4c48;
     _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
     assertEq(address(_beefyVaultWithdrawal.gem()), address(_mooToken));
