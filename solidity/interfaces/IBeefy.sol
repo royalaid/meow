@@ -1,4 +1,4 @@
-pragma solidity 0.8.19;
+pragma solidity 0.8.20;
 
 interface IBeefy {
   function getPricePerFullShare() external view returns (uint256 _pricePerFullShare);
@@ -14,7 +14,12 @@ interface IBeefy {
   function depositAll() external;
   function inCaseTokensGetStuck(address _token) external;
   function increaseAllowance(address spender, uint256 addedValue) external returns (bool);
-  function initialize(address _strategy, string calldata _name, string calldata _symbol, uint256 _approvalDelay) external;
+  function initialize(
+    address _strategy,
+    string calldata _name,
+    string calldata _symbol,
+    uint256 _approvalDelay
+  ) external;
   function name() external view returns (string memory);
   function owner() external view returns (address);
   function proposeStrat(address _implementation) external;
