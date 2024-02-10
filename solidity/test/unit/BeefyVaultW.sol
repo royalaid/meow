@@ -9,14 +9,14 @@ import 'forge-std/console.sol';
 import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 
 contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
-  function test_OwnerSet(address _owner) public {
+  function test_OwnerSet() public {
     _beefyVaultWithdrawal = new BeefyVaultPSM();
     _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
-    assertEq(_beefyVaultWithdrawal.owner(), address(0));
+    assertEq(_beefyVaultWithdrawal.owner(), address(_owner));
   }
 
-  function test_TokenSet(IERC20 _mooToken) public {
+  function test_TokenSet() public {
     _beefyVaultWithdrawal = new BeefyVaultPSM();
     _beefyVaultWithdrawal.initialize(address(_mooToken), 100, 100);
 
@@ -126,7 +126,7 @@ contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor
     _beefyVaultWithdrawal.scheduleWithdraw(_withdrawAmount);
 
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
-    vm.warp(block.timestamp + 1 days);
+    vm.warp(block.timestamp + 4 days);
 
     // Mock the transferFrom call to simulate the withdrawal execution
     vm.mockCall(
@@ -135,11 +135,10 @@ contract UnitBeefyVaultWithdrawalWithdraw is UnitBeefyVaultWithdrawalConstructor
       abi.encode(true)
     );
 
+    // Execute the withdrawal
+    _beefyVaultWithdrawal.withdraw();
     // Expect the Withdrawn event to be emitted with the correct parameters
     vm.expectEmit(true, false, false, true, address(_beefyVaultWithdrawal));
     emit Withdrawn(_user, _withdrawAmount);
-
-    // Execute the withdrawal
-    _beefyVaultWithdrawal.withdraw();
   }
 }
