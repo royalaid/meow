@@ -118,6 +118,8 @@ contract BeefyVaultPSM {
     if (withdrawalEpoch[msg.sender] != 0) {
       revert WithdrawalAlreadyScheduled();
     }
+    if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
+
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
