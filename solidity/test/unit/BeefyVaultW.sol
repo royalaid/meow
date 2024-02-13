@@ -159,9 +159,10 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.withdraw();
     } else {
-      // vm.expectEmit(false, false, false, false);
-      // emit Withdrawn(_user, _withdrawAmount);
+      vm.expectEmit(false, false, false, false);
+      emit Withdrawn(_user, _withdrawAmount);
       psm.withdraw();
+      assert(_usdbcToken.balanceOf(_user) >= _withdrawAmount / 1e12);
     }
     // Expect the Withdrawn event to be emitted with the correct parameters
   }
