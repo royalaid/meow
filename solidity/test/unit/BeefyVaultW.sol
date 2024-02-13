@@ -143,14 +143,21 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
     //   abi.encodeWithSelector(IERC20.transferFrom.selector, _user, address(psm), _withdrawAmount),
     //   abi.encode(true)
     // );
-
     // Execute the withdrawal
-    if (_withdrawAmount > _depositAmount * 10 ** 12) {
+    console.log('totalStableLiquidity:      ', psm.totalStableLiquidity());
+    console.log('withdrawAmount:            ', _withdrawAmount);
+    if (psm.totalStableLiquidity() < _withdrawAmount / 1e12) {
+      console.log('Not enough liquidity');
+      vm.expectRevert(BeefyVaultPSM.NotEnoughLiquidity.selector);
       psm.withdraw();
-      vm.expectRevert();
-    } else if (_withdrawAmount < psm.minimumWithdrawalFee() || _withdrawAmount > psm.maxWithdraw()) {
-      psm.withdraw();
+    } else if (_withdrawAmount > _depositAmount * 10 ** 12) {
+      console.log('Withdraw amount too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+      psm.withdraw();
+    } else if (_withdrawAmount < psm.minimumWithdrawalFee() || _withdrawAmount > psm.maxWithdraw()) {
+      console.log('Invalid amount');
+      vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+      psm.withdraw();
     } else {
       // vm.expectEmit(false, false, false, false);
       // emit Withdrawn(_user, _withdrawAmount);
