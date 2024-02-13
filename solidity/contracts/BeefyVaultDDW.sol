@@ -42,6 +42,7 @@ contract BeefyVaultPSM {
   error AlreadyInitialized();
   error NewOwnerCannotBeZeroAddress();
   error WithdrawalNotAvailable();
+  error NotEnoughLiquidity();
 
   // Events
   event Deposited(address indexed _user, uint256 _amount);
@@ -130,22 +131,24 @@ contract BeefyVaultPSM {
     if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
       revert WithdrawalNotAvailable();
     }
+
     withdrawalEpoch[msg.sender] = 0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     scheduledWithdrawalAmount[msg.sender] = 0;
-
+    uint256 toWithdraw = _amount / (10 ** decimalDifference);
+    uint256 fee = calculateFee(toWithdraw, false);
+    uint256 toWithdrawwFee = (toWithdraw - fee);
+    if (toWithdraw > totalStableLiquidity) {
+      revert NotEnoughLiquidity();
+    }
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
     beef.withdraw(shares);
 
-    uint256 toWithdraw = _amount / (10 ** decimalDifference);
-    console.log(totalStableLiquidity);
-    console.log(toWithdraw);
     totalStableLiquidity -= toWithdraw;
-    uint256 fee = calculateFee(toWithdraw, false);
 
-    IERC20(underlying).transfer(msg.sender, (toWithdraw - fee));
+    IERC20(underlying).transfer(msg.sender, toWithdrawwFee);
 
     emit Withdrawn(msg.sender, _amount);
   }
