@@ -103,7 +103,7 @@ contract BeefyVaultPSM {
 
   // user deposits tokens (6 decimals), withdraws stable
   function deposit(uint256 _amount) external pausable {
-    if (_amount < minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
+    if (_amount <= minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
     IERC20(underlying).transferFrom(msg.sender, address(this), _amount);
     uint256 fee = calculateFee(_amount, true);
     _amount = _amount - fee;

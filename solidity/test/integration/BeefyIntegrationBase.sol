@@ -29,9 +29,9 @@ contract BeefyIntegrationBase is Test {
     _beefyVault = IBeefy(address(_mooToken));
     psm = new BeefyVaultPSM();
     deal(address(_maiToken), address(psm), 100_000_000 * 10 ** 18);
-    console.log('BeefyVaultWithdrawal address:', address(psm));
-    console.log('owner:', psm.owner());
-    console.log('prank:', _owner);
+    // console.log('BeefyVaultWithdrawal address:', address(psm));
+    // console.log('owner:', psm.owner());
+    // console.log('prank:', _owner);
     psm.initialize(address(_mooToken), 100, 100);
     psm.approveBeef();
   }
