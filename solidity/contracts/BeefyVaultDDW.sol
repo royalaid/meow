@@ -136,13 +136,26 @@ contract BeefyVaultPSM {
 
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
-    uint256 shares = _amount * 1e18 / beef.getPricePerFullShare();
+    uint256 shares = (_amount * (10 ** 6)) / beef.getPricePerFullShare();
+    console.log('beef.getPricePerFullShare():', beef.getPricePerFullShare());
+    console.log('Amount:                     ', _amount);
+    console.log('normalizedAmount:           ', _amount / (10 ** 18));
+    console.log('shares:                     ', shares);
+    console.log('Psm shares:                 ', beef.balanceOf(address(this)));
+    console.log('Total Shares:               ', beef.totalSupply());
+    console.log('Beefy Decimals              ', beef.decimals());
+    console.log('decimalDifference:          ', decimalDifference);
+    console.log('Total stable liquidity:     ', totalStableLiquidity);
     beef.withdraw(shares);
+    console.log('Psm shares after:           ', beef.balanceOf(address(this)));
 
     uint256 toWithdraw = _amount / (10 ** decimalDifference);
     console.log(totalStableLiquidity);
     console.log(toWithdraw);
     totalStableLiquidity -= toWithdraw;
+    console.log('============================');
+    console.log('toWithdraw:                 ', toWithdraw);
+
     uint256 fee = calculateFee(toWithdraw, false);
 
     IERC20(underlying).transfer(msg.sender, (toWithdraw - fee));
