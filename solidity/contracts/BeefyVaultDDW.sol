@@ -140,6 +140,8 @@ contract BeefyVaultPSM {
     beef.withdraw(shares);
 
     uint256 toWithdraw = _amount / (10 ** decimalDifference);
+    console.log(totalStableLiquidity);
+    console.log(toWithdraw);
     totalStableLiquidity -= toWithdraw;
     uint256 fee = calculateFee(toWithdraw, false);
 
