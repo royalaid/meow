@@ -47,7 +47,6 @@ contract BeefyVaultPSM {
   // Events
   event Deposited(address indexed _user, uint256 _amount);
   event Withdrawn(address indexed _user, uint256 _amount);
-  event FeesUpdated(uint256 _newDepositFee, uint256 _newWithdrawalFee);
   event OwnerUpdated(address _newOwner);
   event MAIRemoved(address indexed _user, uint256 _amount);
   event FeesWithdrawn(address indexed _owner, uint256 _feesEarned);
