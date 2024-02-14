@@ -58,6 +58,8 @@ contract BeefyVaultPSM {
   event MaxDepositUpdated(uint256 _maxDeposit);
   event MaxWithdrawUpdated(uint256 _maxWithdraw);
   event MinimumFeesUpdated(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee);
+  event FeesUpdated(uint256 _newDepositFee, uint256 _newWithdrawalFee);
+  event MaxUpdated(uint256 _maxDeposit, uint256 _maxWithdraw);
 
   // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
   constructor() {
@@ -153,7 +155,9 @@ contract BeefyVaultPSM {
     console.log('Beefy Decimals              ', beef.decimals());
     console.log('decimalDifference:          ', decimalDifference);
     console.log('Total stable liquidity:     ', totalStableLiquidity);
+
     beef.withdraw(shares);
+
     console.log('Psm shares after:           ', beef.balanceOf(address(this)));
 
     totalStableLiquidity -= toWithdraw;
@@ -187,8 +191,8 @@ contract BeefyVaultPSM {
       IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
     }
   }
-  // TODO: pause toggle should be function-based
 
+  // TODO: pause toggle should be function-based
   function togglePause(bool _paused) external onlyOwner {
     paused = _paused;
     emit PauseEvent(msg.sender, _paused);
@@ -210,5 +214,17 @@ contract BeefyVaultPSM {
     minimumDepositFee = _newMinimumDepositFee;
     minimumWithdrawalFee = _newMinimumWithdrawalFee;
     emit MinimumFeesUpdated(_newMinimumDepositFee, _newMinimumWithdrawalFee);
+  }
+
+  function updateFeesBP(uint256 _newDepositFee, uint256 _newWithdrawalFee) external onlyOwner {
+    depositFee = _newDepositFee;
+    withdrawalFee = _newWithdrawalFee;
+    emit FeesUpdated(_newDepositFee, _newWithdrawalFee);
+  }
+
+  function updateMax(uint256 _maxDeposit, uint256 _maxWithdraw) external onlyOwner {
+    maxDeposit = _maxDeposit;
+    maxWithdraw = _maxWithdraw;
+    emit MaxUpdated(_maxDeposit, _maxWithdraw);
   }
 }
