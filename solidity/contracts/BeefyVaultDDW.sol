@@ -180,12 +180,12 @@ contract BeefyVaultPSM {
     IBeefy beef = IBeefy(gem);
     // get total balance in underlying
     uint256 shares = beef.balanceOf(address(this));
-    uint256 totalStored = beef.getPricePerFullShare() * shares / (10 ** decimalDifference);
-    if (totalStored > totalStableLiquidity) {
-      uint256 fees = (totalStored - totalStableLiquidity); // in USDC
-      uint256 feeShares = fees * beef.getPricePerFullShare() / 1e24;
+    uint256 totalStoredInUsd = beef.getPricePerFullShare() * shares / (10 ** decimalDifference);
+    if (totalStoredInUsd > totalStableLiquidity) {
+      uint256 fees = (totalStoredInUsd - totalStableLiquidity); // in USDC
+      uint256 feeShares = fees * (10 ** decimalDifference) / beef.getPricePerFullShare();
       console.log('Total shares:               ', shares);
-      console.log('Total stored:               ', totalStored);
+      console.log('Total stored:               ', totalStoredInUsd);
       console.log('Total stable liquidity:     ', totalStableLiquidity);
       console.log('Total fees:                 ', fees);
       console.log('Decimal difference:         ', decimalDifference);

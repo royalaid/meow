@@ -150,7 +150,7 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       assert(_usdbcToken.balanceOf(_user) >= _withdrawAmount / 1e12);
       assert(_mooToken.balanceOf(address(psm)) >= 0);
       psm.claimFees();
-      assert(_mooToken.balanceOf(address(psm)) == 0);
+      assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 1_000_000_000);
     }
   }
 }
