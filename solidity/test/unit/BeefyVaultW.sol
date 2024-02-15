@@ -147,17 +147,20 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       vm.expectEmit(false, false, false, false);
       emit Withdrawn(_user, _withdrawAmount);
       psm.withdraw();
-      assert(_usdbcToken.balanceOf(_user) >= _withdrawAmount / 1e12);
-      assert(_mooToken.balanceOf(address(psm)) >= 0);
+      assertGe(_usdbcToken.balanceOf(_user), _withdrawAmount / 1e12);
+      assertGe(_mooToken.balanceOf(address(psm)), 0);
+      uint256 depositFee = psm.calculateFee(_depositAmount, false);
+      uint256 withdrawFee = psm.calculateFee(_withdrawAmount / 1e12, false);
       psm.claimFees();
-      if (_depositAmount > _withdrawAmount / 1e12) {
-        console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
-        console.log('depositAmount:              ', _depositAmount);
+      console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
+      console.log('depositAmount:              ', _depositAmount);
+      console.log('depositFee:                 ', depositFee);
+      console.log('withdrawFee:                ', withdrawFee);
+      //                                    depositAmount   withdrawFee
+      if (_depositAmount > (_withdrawAmount / 1e12) + depositFee + withdrawFee) {
         assertGt(_mooToken.balanceOf(address(psm)), 0, 'mooToken balance should be greater than 0');
       } else {
-        console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
-        console.log('depositAmount:              ', _depositAmount);
-        assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 1_000_000, 'mooToken balance should be 0');
+        assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 100, 'mooToken balance should be 0');
       }
     }
   }
