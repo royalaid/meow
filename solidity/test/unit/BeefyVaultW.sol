@@ -150,7 +150,15 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       assert(_usdbcToken.balanceOf(_user) >= _withdrawAmount / 1e12);
       assert(_mooToken.balanceOf(address(psm)) >= 0);
       psm.claimFees();
-      assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 1_000_000_000);
+      if (_depositAmount > _withdrawAmount / 1e12) {
+        console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
+        console.log('depositAmount:              ', _depositAmount);
+        assertGt(_mooToken.balanceOf(address(psm)), 0, 'mooToken balance should be greater than 0');
+      } else {
+        console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
+        console.log('depositAmount:              ', _depositAmount);
+        assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 1_000_000, 'mooToken balance should be 0');
+      }
     }
   }
 }

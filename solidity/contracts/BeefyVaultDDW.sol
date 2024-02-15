@@ -184,19 +184,22 @@ contract BeefyVaultPSM {
     // get total balance in underlying
     uint256 shares = beef.balanceOf(address(this));
     uint256 totalStoredInUsd = beef.getPricePerFullShare() * shares / (10 ** decimalDifference);
+    uint256 totalStableLiquidityShares = totalStableLiquidity * (10 ** decimalDifference) / beef.getPricePerFullShare();
     if (totalStoredInUsd > totalStableLiquidity) {
       uint256 fees = (totalStoredInUsd - totalStableLiquidity); // in USDC
       uint256 feeShares = fees * (10 ** decimalDifference) / beef.getPricePerFullShare();
+      console.log('Decimal difference:         ', decimalDifference);
+      console.log('beef.getPricePerFullShare():', beef.getPricePerFullShare());
       console.log('Total shares:               ', shares);
       console.log('Total stored:               ', totalStoredInUsd);
       console.log('Total stable liquidity:     ', totalStableLiquidity);
+      console.log('totalStableLiquidityShares: ', totalStableLiquidityShares);
       console.log('Total fees:                 ', fees);
-      console.log('Decimal difference:         ', decimalDifference);
-      console.log('beef.getPricePerFullShare():', beef.getPricePerFullShare());
       console.log('feeShares:                  ', feeShares);
+      console.log('total - totalStableShares:  ', shares - totalStableLiquidityShares);
       // convert back to shares i guess
       // afaik this is off bc 6 decimals
-      beef.withdraw(feeShares);
+      beef.withdraw(shares - totalStableLiquidityShares);
       IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
     }
   }
