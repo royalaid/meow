@@ -51,6 +51,7 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
     uint256 maxDeposit = psm.maxDeposit();
     uint256 minDeposit = psm.minimumDepositFee();
     if (_amount < minDeposit || _amount > maxDeposit) {
+      console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.deposit(_amount);
       return;
@@ -60,6 +61,7 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
     uint256 maxWithdraw = psm.maxWithdraw();
     uint256 minWithdraw = psm.minimumWithdrawalFee();
     if (_amount < minWithdraw || _amount > maxWithdraw) {
+      console.log('Withdraw amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.deposit(_amount);
       return;
@@ -68,13 +70,11 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
     // Calculate the expected fee
     uint256 expectedFee = psm.calculateFee(_amount, true);
 
-    uint256 initialMooBalance = _mooToken.balanceOf(address(psm));
-    uint256 initialMaiBalance = _maiToken.balanceOf(_user);
-
     vm.startPrank(_user);
     _usdbcToken.approve(address(psm), _amount);
     // If the deposit amount is less than or equal to the minimumDepositFee or the fee, expect a revert
     if (_amount <= psm.minimumDepositFee() || _amount <= expectedFee) {
+      console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.deposit(_amount);
       return;
@@ -83,16 +83,6 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
     vm.expectEmit(true, false, false, true);
     emit Deposited(_user, _amount - expectedFee);
     psm.deposit(_amount);
-
-    uint256 finalMooBalance = _mooToken.balanceOf(address(psm));
-    uint256 finalMaiBalance = _maiToken.balanceOf(_user);
-
-    // Check that the mooToken balance of the BeefyVaultWithdrawal contract has increased by _amount
-    // assertEq(finalMooBalance, initialMooBalance + _amount, 'mooToken balance did not increase correctly');
-
-    // Check that the maiToken balance of the user has decreased by the correct amount after deposit
-    // uint256 expectedMaiBalance = initialMaiBalance - _amount; // Adjust this calculation based on the fee logic if necessary
-    // assertEq(finalMaiBalance, expectedMaiBalance, 'maiToken balance did not decrease correctly');
   }
 }
 
@@ -117,6 +107,7 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
     console.log('mooToken balance bfore:', _mooToken.balanceOf(address(psm)));
 
     if (_depositAmount <= psm.minimumDepositFee() || _depositAmount > psm.maxDeposit()) {
+      console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.deposit(_depositAmount);
       return;
@@ -127,6 +118,7 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
 
     // Schedule the withdrawal
     if (_withdrawAmount < psm.minimumWithdrawalFee() || _withdrawAmount > psm.maxWithdraw()) {
+      console.log('Withdraw Amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
       psm.scheduleWithdraw(_withdrawAmount);
       return;
@@ -136,13 +128,6 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
 
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
     vm.warp(block.timestamp + 4 days);
-
-    // Mock the transferFrom call to simulate the withdrawal execution
-    // vm.mockCall(
-    //   address(_maiToken),
-    //   abi.encodeWithSelector(IERC20.transferFrom.selector, _user, address(psm), _withdrawAmount),
-    //   abi.encode(true)
-    // );
     // Execute the withdrawal
     console.log('totalStableLiquidity:      ', psm.totalStableLiquidity());
     console.log('withdrawAmount:            ', _withdrawAmount);
@@ -164,6 +149,5 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       psm.withdraw();
       assert(_usdbcToken.balanceOf(_user) >= _withdrawAmount / 1e12);
     }
-    // Expect the Withdrawn event to be emitted with the correct parameters
   }
 }
