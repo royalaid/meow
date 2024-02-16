@@ -34,7 +34,7 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
   event Deposited(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
-    psm.togglePause(true);
+    //psm.togglePause(true);
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     psm.deposit(100_000_000);
   }
@@ -90,7 +90,7 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
   event Withdrawn(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
-    psm.togglePause(true);
+    //psm.setPaused(selector, _paused);(true); needs to be upgraded
 
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     psm.scheduleWithdraw(1000);

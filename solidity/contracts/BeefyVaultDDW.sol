@@ -18,6 +18,7 @@ contract BeefyVaultPSM {
 
   uint256 public maxDeposit;
   uint256 public maxWithdraw;
+  uint256 public upgradeTime;
 
   address public underlying;
   address public owner;
@@ -27,7 +28,9 @@ contract BeefyVaultPSM {
   mapping(address => uint256) public withdrawalEpoch;
   mapping(address => uint256) public scheduledWithdrawalAmount;
 
-  bool public paused;
+  mapping(bytes4 => bool) public paused;
+  bool public stopped;
+
   bool public initialized;
 
   error CallerIsNotOwner();
@@ -50,7 +53,7 @@ contract BeefyVaultPSM {
   event OwnerUpdated(address _newOwner);
   event MAIRemoved(address indexed _user, uint256 _amount);
   event FeesWithdrawn(address indexed _owner, uint256 _feesEarned);
-  event PauseEvent(address _account, bool _paused);
+  event PauseEvent(address _account, bytes4 selector, bool _paused);
   event WithdrawalCancelled(address indexed _user, uint256 _amount);
   event ScheduledWithdrawal(address indexed _user, uint256 _amount);
   event WithdrawalScheduled(address indexed _user, uint256 _amount);
@@ -73,7 +76,7 @@ contract BeefyVaultPSM {
   }
 
   modifier pausable() {
-    if (paused) revert ContractIsPaused();
+    if (paused[msg.sig] || stopped && block.timestamp > upgradeTime) revert ContractIsPaused();
     _;
   }
 
@@ -198,17 +201,28 @@ contract BeefyVaultPSM {
     }
   }
 
-  // TODO: pause toggle should be function-based
-  function togglePause(bool _paused) external onlyOwner {
-    paused = _paused;
-    emit PauseEvent(msg.sender, _paused);
+  function setPaused(bytes4 selector, bool _paused) external onlyOwner {
+    paused[selector] = _paused;
+    emit PauseEvent(msg.sender, selector, _paused);
   }
 
-  // TODO: Use nomination-transfership
   function transferOwnership(address newOwner) external onlyOwner {
     if (newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
     owner = newOwner;
     emit OwnerUpdated(newOwner);
+  }
+
+  function setUpgrade() external onlyOwner {
+    if (!stopped) {
+      stopped = true;
+      upgradeTime = block.timestamp + 2 days;
+    }
+  }
+
+  function transferToken(address _token, address _to, uint256 _amount) external onlyOwner {
+    if (stopped && block.timestamp > upgradeTime) {
+      IERC20(_token).transfer(_to, _amount);
+    }
   }
 
   function withdrawMAI() external onlyOwner {
