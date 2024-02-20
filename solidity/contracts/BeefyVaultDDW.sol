@@ -2,7 +2,6 @@ pragma solidity 0.8.20;
 
 import '../interfaces/IBeefy.sol';
 import '../interfaces/IERC20.sol';
-import 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -69,8 +68,6 @@ contract BeefyVaultPSM {
   }
 
   modifier onlyOwner() {
-    console.log('msg.sender:', msg.sender);
-    console.log('owner:', owner);
     if (msg.sender != owner) revert CallerIsNotOwner();
     _;
   }
@@ -81,9 +78,7 @@ contract BeefyVaultPSM {
   }
 
   function initialize(address _gem, uint256 _depositFee, uint256 _withdrawalFee) external onlyOwner {
-    console.log('Initializing BeefyVaultPSM');
     if (initialized) {
-      console.log('Already initialized');
       revert AlreadyInitialized();
     }
     depositFee = _depositFee;
@@ -98,7 +93,6 @@ contract BeefyVaultPSM {
     underlying = beef.want();
     decimalDifference = uint256(beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
-    console.log('Gem:', gem);
     approveBeef();
   }
 
@@ -148,19 +142,8 @@ contract BeefyVaultPSM {
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 shares = (_amount * (10 ** 6)) / beef.getPricePerFullShare();
-    console.log('beef.getPricePerFullShare():', beef.getPricePerFullShare());
-    console.log('Amount:                     ', _amount);
-    console.log('normalizedAmount:           ', _amount / (10 ** 18));
-    console.log('shares:                     ', shares);
-    console.log('Psm shares:                 ', beef.balanceOf(address(this)));
-    console.log('Total Shares:               ', beef.totalSupply());
-    console.log('Beefy Decimals              ', beef.decimals());
-    console.log('decimalDifference:          ', decimalDifference);
-    console.log('Total stable liquidity:     ', totalStableLiquidity);
 
     beef.withdraw(shares);
-
-    console.log('Psm shares after:           ', beef.balanceOf(address(this)));
 
     totalStableLiquidity -= toWithdraw;
 
@@ -187,18 +170,6 @@ contract BeefyVaultPSM {
     uint256 totalStableLiquidityShares = totalStableLiquidity * (10 ** decimalDifference) / beef.getPricePerFullShare();
     if (totalStoredInUsd > totalStableLiquidity) {
       uint256 fees = (totalStoredInUsd - totalStableLiquidity); // in USDC
-      uint256 feeShares = fees * (10 ** decimalDifference) / beef.getPricePerFullShare();
-      console.log('Decimal difference:         ', decimalDifference);
-      console.log('beef.getPricePerFullShare():', beef.getPricePerFullShare());
-      console.log('Total shares:               ', shares);
-      console.log('Total stored:               ', totalStoredInUsd);
-      console.log('Total stable liquidity:     ', totalStableLiquidity);
-      console.log('totalStableLiquidityShares: ', totalStableLiquidityShares);
-      console.log('Total fees:                 ', fees);
-      console.log('feeShares:                  ', feeShares);
-      console.log('total - totalStableShares:  ', shares - totalStableLiquidityShares);
-      // convert back to shares i guess
-      // afaik this is off bc 6 decimals
       beef.withdraw(shares - totalStableLiquidityShares);
       IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
     }
