@@ -122,7 +122,7 @@ contract BeefyVaultPSM {
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
+    IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
   }
 
   function withdraw() external pausable {
