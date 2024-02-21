@@ -2,6 +2,7 @@ pragma solidity 0.8.20;
 
 import '../interfaces/IBeefy.sol';
 import '../interfaces/IERC20.sol';
+import 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -122,7 +123,16 @@ contract BeefyVaultPSM {
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
-    IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
+  }
+
+  function calculateAmountToShares(uint256 _amount) internal view returns (uint256 _shares) {
+    IBeefy beef = IBeefy(gem);
+    return (_amount * beef.totalSupply()) / beef.balance();
+  }
+
+  function calculateSharesToAmount(uint256 _shares) internal view returns (uint256 _amount) {
+    IBeefy beef = IBeefy(gem);
+    return (_shares * beef.balance()) / beef.totalSupply();
   }
 
   function withdraw() external pausable {
@@ -141,9 +151,17 @@ contract BeefyVaultPSM {
     }
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
+    uint256 freshShares = calculateAmountToShares(_amount);
+    uint256 freshSharesRounded = (freshShares / (10 ** decimalDifference)) + 1;
     uint256 shares = (_amount * (10 ** 6)) / beef.getPricePerFullShare();
+    console.log('shares:                    ', shares);
+    console.log('sharesInContract:          ', beef.balanceOf(address(this)));
+    console.log('shareValueUsd:             ', (beef.getPricePerFullShare() * shares) / (10 ** 6));
+    console.log('amount:                    ', _amount);
+    console.log('freshShareValueUsd:        ', (beef.getPricePerFullShare() * freshSharesRounded) / (10 ** 6));
+    console.log('freshShares:               ', freshSharesRounded);
 
-    beef.withdraw(shares);
+    beef.withdraw(freshSharesRounded);
 
     totalStableLiquidity -= toWithdraw;
 
@@ -166,11 +184,14 @@ contract BeefyVaultPSM {
     IBeefy beef = IBeefy(gem);
     // get total balance in underlying
     uint256 shares = beef.balanceOf(address(this));
-    uint256 totalStoredInUsd = beef.getPricePerFullShare() * shares / (10 ** decimalDifference);
-    uint256 totalStableLiquidityShares = totalStableLiquidity * (10 ** decimalDifference) / beef.getPricePerFullShare();
+    uint256 totalStoredInUsd = calculateSharesToAmount(shares) / (10 ** decimalDifference);
+    uint256 totalStableShares = calculateAmountToShares(totalStableLiquidity) / (10 ** decimalDifference);
+    console.log('totalStableLiquidity:      ', totalStableLiquidity);
+    console.log('totalStoredInUsd:          ', totalStoredInUsd);
+    console.log('totalStableShares:         ', totalStableShares);
     if (totalStoredInUsd > totalStableLiquidity) {
       uint256 fees = (totalStoredInUsd - totalStableLiquidity); // in USDC
-      beef.withdraw(shares - totalStableLiquidityShares);
+      beef.withdraw(shares - totalStableShares);
       IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
     }
   }
