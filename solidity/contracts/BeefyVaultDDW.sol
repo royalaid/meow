@@ -152,7 +152,7 @@ contract BeefyVaultPSM {
     IBeefy beef = IBeefy(gem);
     // get shares from an amount
     uint256 freshShares = calculateAmountToShares(_amount);
-    uint256 freshSharesRounded = (freshShares / (10 ** decimalDifference)) + 1;
+    uint256 freshSharesRounded = (freshShares / (10 ** decimalDifference));
     uint256 shares = (_amount * (10 ** 6)) / beef.getPricePerFullShare();
     console.log('shares:                    ', shares);
     console.log('sharesInContract:          ', beef.balanceOf(address(this)));
