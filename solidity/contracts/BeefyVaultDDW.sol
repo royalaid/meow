@@ -1,8 +1,8 @@
 pragma solidity 0.8.20;
 
-import '../interfaces/IBeefy.sol';
-import '../interfaces/IERC20.sol';
-import 'forge-std/console.sol';
+import {IBeefy} from '../interfaces/IBeefy.sol';
+import {IERC20} from '../interfaces/IERC20.sol';
+import {console} from 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -53,7 +53,7 @@ contract BeefyVaultPSM {
   event OwnerUpdated(address _newOwner);
   event MAIRemoved(address indexed _user, uint256 _amount);
   event FeesWithdrawn(address indexed _owner, uint256 _feesEarned);
-  event PauseEvent(address _account, bytes4 selector, bool _paused);
+  event PauseEvent(address _account, bytes4 _selector, bool _paused);
   event WithdrawalCancelled(address indexed _user, uint256 _amount);
   event ScheduledWithdrawal(address indexed _user, uint256 _amount);
   event WithdrawalScheduled(address indexed _user, uint256 _amount);
@@ -87,12 +87,12 @@ contract BeefyVaultPSM {
     minimumDepositFee = 1_000_000;
     minimumWithdrawalFee = 1_000_000;
 
-    IBeefy beef = IBeefy(_gem);
+    IBeefy _beef = IBeefy(_gem);
 
     maxDeposit = 1e24; // 1 million ether
     maxWithdraw = 1e24; // 1 million ether
-    underlying = beef.want();
-    decimalDifference = uint256(beef.decimals() - IERC20(underlying).decimals());
+    underlying = _beef.want();
+    decimalDifference = uint256(_beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
     approveBeef();
   }
@@ -105,8 +105,8 @@ contract BeefyVaultPSM {
   function deposit(uint256 _amount) external pausable {
     if (_amount <= minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
     IERC20(underlying).transferFrom(msg.sender, address(this), _amount);
-    uint256 fee = calculateFee(_amount, true);
-    _amount = _amount - fee;
+    uint256 _fee = calculateFee(_amount, true);
+    _amount = _amount - _fee;
     totalStableLiquidity += _amount;
     IBeefy(gem).depositAll();
 
@@ -125,17 +125,18 @@ contract BeefyVaultPSM {
     emit WithdrawalScheduled(msg.sender, _amount);
   }
 
-  function calculateAmountToShares(uint256 _amount) internal view returns (uint256 _shares) {
-    IBeefy beef = IBeefy(gem);
-    return (_amount * beef.totalSupply()) / beef.balance();
+  function _calculateAmountToShares(uint256 _amount) internal view returns (uint256 _shares) {
+    IBeefy _beef = IBeefy(gem);
+    return (_amount * _beef.totalSupply()) / _beef.balance();
   }
 
-  function calculateSharesToAmount(uint256 _shares) internal view returns (uint256 _amount) {
-    IBeefy beef = IBeefy(gem);
-    return (_shares * beef.balance()) / beef.totalSupply();
+  function _calculateSharesToAmount(uint256 _shares) internal view returns (uint256 _amount) {
+    IBeefy _beef = IBeefy(gem);
+    return (_shares * _beef.balance()) / _beef.totalSupply();
   }
 
   function withdraw() external pausable {
+    console.log('msg.sender:                ', msg.sender);
     if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
       revert WithdrawalNotAvailable();
     }
@@ -143,29 +144,32 @@ contract BeefyVaultPSM {
     withdrawalEpoch[msg.sender] = 0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     scheduledWithdrawalAmount[msg.sender] = 0;
-    uint256 toWithdraw = _amount / (10 ** decimalDifference);
-    uint256 fee = calculateFee(toWithdraw, false);
-    uint256 toWithdrawwFee = (toWithdraw - fee);
-    if (toWithdraw > totalStableLiquidity) {
+    uint256 _toWithdraw = _amount / (10 ** decimalDifference);
+    uint256 _fee = calculateFee(_toWithdraw, false);
+    uint256 _toWithdrawwFee = (_toWithdraw - _fee);
+    if (_toWithdraw > totalStableLiquidity) {
       revert NotEnoughLiquidity();
     }
-    IBeefy beef = IBeefy(gem);
+    IBeefy _beef = IBeefy(gem);
     // get shares from an amount
-    uint256 freshShares = calculateAmountToShares(_amount);
-    uint256 freshSharesRounded = (freshShares / (10 ** decimalDifference));
-    uint256 shares = (_amount * (10 ** 6)) / beef.getPricePerFullShare();
-    console.log('shares:                    ', shares);
-    console.log('sharesInContract:          ', beef.balanceOf(address(this)));
-    console.log('shareValueUsd:             ', (beef.getPricePerFullShare() * shares) / (10 ** 6));
+    uint256 _freshShares = _calculateAmountToShares(_amount);
+    uint256 _freshSharesRounded = (_freshShares / (10 ** decimalDifference));
+    uint256 _shares = (_amount * (10 ** 6)) / _beef.getPricePerFullShare();
+    console.log('shares:                    ', _shares);
+    console.log('sharesInContract:          ', _beef.balanceOf(address(this)));
+    console.log('shareValueUsd:             ', (_beef.getPricePerFullShare() * _shares) / (10 ** 6));
     console.log('amount:                    ', _amount);
-    console.log('freshShareValueUsd:        ', (beef.getPricePerFullShare() * freshSharesRounded) / (10 ** 6));
-    console.log('freshShares:               ', freshSharesRounded);
+    console.log('freshShareValueUsd:        ', (_beef.getPricePerFullShare() * _freshSharesRounded) / (10 ** 6));
+    console.log('freshShares:               ', _freshSharesRounded);
 
-    beef.withdraw(freshSharesRounded);
+    _beef.withdraw(_freshSharesRounded);
 
-    totalStableLiquidity -= toWithdraw;
-
-    IERC20(underlying).transfer(msg.sender, toWithdrawwFee);
+    totalStableLiquidity -= _toWithdraw;
+    console.log('underlying:                ', address(underlying));
+    console.log('usdbc before:              ', IERC20(underlying).balanceOf(msg.sender));
+    bool _suc = IERC20(underlying).transfer(msg.sender, _toWithdrawwFee);
+    console.log('suc:                       ', _suc);
+    console.log('usdbc after:               ', IERC20(underlying).balanceOf(msg.sender));
 
     emit Withdrawn(msg.sender, _amount);
   }
@@ -181,30 +185,30 @@ contract BeefyVaultPSM {
   }
 
   function claimFees() external onlyOwner {
-    IBeefy beef = IBeefy(gem);
+    IBeefy _beef = IBeefy(gem);
     // get total balance in underlying
-    uint256 shares = beef.balanceOf(address(this));
-    uint256 totalStoredInUsd = calculateSharesToAmount(shares) / (10 ** decimalDifference);
-    uint256 totalStableShares = calculateAmountToShares(totalStableLiquidity) / (10 ** decimalDifference);
+    uint256 _shares = _beef.balanceOf(address(this));
+    uint256 _totalStoredInUsd = _calculateSharesToAmount(_shares) / (10 ** decimalDifference);
+    uint256 _totalStableShares = _calculateAmountToShares(totalStableLiquidity) / (10 ** decimalDifference);
     console.log('totalStableLiquidity:      ', totalStableLiquidity);
-    console.log('totalStoredInUsd:          ', totalStoredInUsd);
-    console.log('totalStableShares:         ', totalStableShares);
-    if (totalStoredInUsd > totalStableLiquidity) {
-      uint256 fees = (totalStoredInUsd - totalStableLiquidity); // in USDC
-      beef.withdraw(shares - totalStableShares);
-      IERC20(underlying).transfer(msg.sender, fees / (10 ** decimalDifference));
+    console.log('totalStoredInUsd:          ', _totalStoredInUsd);
+    console.log('totalStableShares:         ', _totalStableShares);
+    if (_totalStoredInUsd > totalStableLiquidity) {
+      uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
+      _beef.withdraw(_shares - _totalStableShares);
+      IERC20(underlying).transfer(msg.sender, _fees / (10 ** decimalDifference));
     }
   }
 
-  function setPaused(bytes4 selector, bool _paused) external onlyOwner {
-    paused[selector] = _paused;
-    emit PauseEvent(msg.sender, selector, _paused);
+  function setPaused(bytes4 _selector, bool _paused) external onlyOwner {
+    paused[_selector] = _paused;
+    emit PauseEvent(msg.sender, _selector, _paused);
   }
 
-  function transferOwnership(address newOwner) external onlyOwner {
-    if (newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
-    owner = newOwner;
-    emit OwnerUpdated(newOwner);
+  function transferOwnership(address _newOwner) external onlyOwner {
+    if (_newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
+    owner = _newOwner;
+    emit OwnerUpdated(_newOwner);
   }
 
   function setUpgrade() external onlyOwner {
@@ -221,8 +225,8 @@ contract BeefyVaultPSM {
   }
 
   function withdrawMAI() external onlyOwner {
-    IERC20 mai = IERC20(MAI_ADDRESS);
-    mai.transfer(msg.sender, mai.balanceOf(address(this)));
+    IERC20 _mai = IERC20(MAI_ADDRESS);
+    _mai.transfer(msg.sender, _mai.balanceOf(address(this)));
   }
 
   function updateMinimumFees(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee) external onlyOwner {

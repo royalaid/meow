@@ -10,23 +10,23 @@ import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 
 contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet() public {
-    psm = new BeefyVaultPSM();
-    psm.initialize(address(_mooToken), 100, 100);
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
 
-    assertEq(psm.owner(), address(_owner));
+    assertEq(_psm.owner(), address(_owner));
   }
 
   function test_TokenSet() public {
-    psm = new BeefyVaultPSM();
-    psm.initialize(address(_mooToken), 100, 100);
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
 
-    assertEq(address(psm.gem()), address(_mooToken));
+    assertEq(address(_psm.gem()), address(_mooToken));
   }
 
   function test_BeefySet() public {
-    psm = new BeefyVaultPSM();
-    psm.initialize(address(_mooToken), 100, 100);
-    assertEq(address(psm.underlying()), address(_usdbcToken));
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+    assertEq(address(_psm.underlying()), address(_usdbcToken));
   }
 }
 
@@ -34,36 +34,36 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
   event Deposited(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
-    psm.setPaused(BeefyVaultPSM.deposit.selector, true);
+    _psm.setPaused(BeefyVaultPSM.deposit.selector, true);
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
-    psm.deposit(100_000_000);
+    _psm.deposit(100_000_000);
   }
 
   function test_Deposit_ZeroAmountReverts() public {
     uint256 _amount = 0;
     vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-    psm.deposit(_amount);
+    _psm.deposit(_amount);
   }
 
   function test_Deposit(uint256 _amount) public {
     bound(_amount, 0, _usdbcToken.balanceOf(msg.sender));
     // Verify that the deposit amount is within the allowed range for deposits
-    uint256 maxDeposit = psm.maxDeposit();
-    uint256 minDeposit = psm.minimumDepositFee();
+    uint256 maxDeposit = _psm.maxDeposit();
+    uint256 minDeposit = _psm.minimumDepositFee();
     if (_amount < minDeposit || _amount > maxDeposit) {
       console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.deposit(_amount);
+      _psm.deposit(_amount);
       return;
     }
 
     // Verify that the withdrawal amount is within the allowed range for withdrawals
-    uint256 maxWithdraw = psm.maxWithdraw();
-    uint256 minWithdraw = psm.minimumWithdrawalFee();
+    uint256 maxWithdraw = _psm.maxWithdraw();
+    uint256 minWithdraw = _psm.minimumWithdrawalFee();
     if (_amount < minWithdraw || _amount > maxWithdraw) {
       console.log('Withdraw amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.deposit(_amount);
+      _psm.deposit(_amount);
       return;
     }
 
@@ -71,29 +71,40 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
 
     vm.startPrank(_user);
     bound(_amount, 0, _usdbcToken.balanceOf(_user) - 1);
-    uint256 expectedFee = psm.calculateFee(_amount, true);
-    _usdbcToken.approve(address(psm), _amount);
+    uint256 expectedFee = _psm.calculateFee(_amount, true);
+    _usdbcToken.approve(address(_psm), _amount);
     // If the deposit amount is less than or equal to the minimumDepositFee or the fee, expect a revert
     console.log('Deposit amount:      ', _amount);
     console.log('token balance:       ', _usdbcToken.balanceOf(_user));
-    console.log('maxDeposit:          ', psm.maxDeposit());
-    console.log('minimumDepositFee:   ', psm.minimumDepositFee());
+    console.log('maxDeposit:          ', _psm.maxDeposit());
+    console.log('minimumDepositFee:   ', _psm.minimumDepositFee());
     if (_amount > _usdbcToken.balanceOf(_user)) {
       console.log('Deposit amount too large');
       vm.expectRevert();
-      psm.deposit(_amount);
+      _psm.deposit(_amount);
       return;
     }
-    if (_amount <= psm.minimumDepositFee() || _amount <= expectedFee) {
+    if (_amount <= _psm.minimumDepositFee() || _amount <= expectedFee) {
       console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.deposit(_amount);
+      _psm.deposit(_amount);
       return;
     } else {
       // Expect the Deposited event to be emitted with the correct parameters
       // vm.expectEmit(true, false, false, true);
       // emit Deposited(_user, _amount - expectedFee);
-      psm.deposit(_amount);
+      uint256 amtBefore = _usdbcToken.balanceOf(_user);
+      uint256 maiBalanceBefore = _maiToken.balanceOf(_user);
+      _psm.deposit(_amount);
+      uint256 amtAfter = _usdbcToken.balanceOf(_user);
+      uint256 maiBalanceAfter = _maiToken.balanceOf(_user);
+
+      assertEq(amtBefore - _amount, amtAfter, 'Users token balance should decrease by the deposit amount');
+      assertEq(
+        (maiBalanceAfter - maiBalanceBefore) / 10 ** 12,
+        _amount - expectedFee,
+        'Users MAI balance should increase by the deposit amount minus the fee'
+      );
     }
   }
 }
@@ -102,77 +113,114 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
   event Withdrawn(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
-    psm.setPaused(BeefyVaultPSM.scheduleWithdraw.selector, true);
+    _psm.setPaused(BeefyVaultPSM.scheduleWithdraw.selector, true);
 
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
-    psm.scheduleWithdraw(1000);
+    _psm.scheduleWithdraw(1000);
   }
 
   function test_DepositAndWithdraw(uint256 _depositAmount, uint256 _withdrawAmount) public {
     _depositAmount = bound(_depositAmount, 1e6, _usdbcToken.balanceOf(_user));
     _withdrawAmount = bound(_withdrawAmount, 1e18, _depositAmount * 10 ** 12);
     // Deposit first to ensure there are tokens to withdraw
-    _usdbcToken.approve(address(psm), _depositAmount);
+    _usdbcToken.approve(address(_psm), _depositAmount);
     console.log('Deposit amount:', _depositAmount);
-    console.log('maxDeposit:', psm.maxDeposit());
-    console.log('minimumDepositFee:', psm.minimumDepositFee());
-    console.log('mooToken balance bfore:', _mooToken.balanceOf(address(psm)));
+    console.log('maxDeposit:', _psm.maxDeposit());
+    console.log('minimumDepositFee:', _psm.minimumDepositFee());
+    console.log('mooToken balance bfore:', _mooToken.balanceOf(address(_psm)));
 
-    if (_depositAmount <= psm.minimumDepositFee() || _depositAmount > psm.maxDeposit()) {
+    if (_depositAmount <= _psm.minimumDepositFee() || _depositAmount > _psm.maxDeposit()) {
       console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.deposit(_depositAmount);
+      _psm.deposit(_depositAmount);
       return;
     } else {
-      psm.deposit(_depositAmount);
+      uint256 _expectedFee = _psm.calculateFee(_depositAmount, true);
+      uint256 _amtBefore = _usdbcToken.balanceOf(_owner);
+      uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
+      _psm.deposit(_depositAmount);
+      uint256 _amtAfter = _usdbcToken.balanceOf(_owner);
+      uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
+      assertApproxEqAbs(
+        _amtBefore, _amtAfter + _depositAmount, 10, 'Users token BALANCE should decrease by the deposit amount'
+      );
+      assertApproxEqAbs(
+        (_maiBalanceAfter - _maiBalanceBefore) / 10 ** 12,
+        _depositAmount - _expectedFee,
+        10,
+        'Users MAI balance should increase by the deposit amount minus the fee'
+      );
     }
-    console.log('mooToken balance after:', _mooToken.balanceOf(address(psm)));
+    console.log('mooToken balance after:', _mooToken.balanceOf(address(_psm)));
 
     // Schedule the withdrawal
-    if (_withdrawAmount < psm.minimumWithdrawalFee() || _withdrawAmount > psm.maxWithdraw()) {
+    if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
       console.log('Withdraw Amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.scheduleWithdraw(_withdrawAmount);
+      _psm.scheduleWithdraw(_withdrawAmount);
       return;
     } else {
-      psm.scheduleWithdraw(_withdrawAmount);
+      _psm.scheduleWithdraw(_withdrawAmount);
     }
 
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
     vm.warp(block.timestamp + 4 days);
     // Execute the withdrawal
-    console.log('totalStableLiquidity:      ', psm.totalStableLiquidity());
+    console.log('totalStableLiquidity:      ', _psm.totalStableLiquidity());
     console.log('withdrawAmount:            ', _withdrawAmount);
-    if (psm.totalStableLiquidity() < _withdrawAmount / 1e12) {
+    if (_psm.totalStableLiquidity() < _withdrawAmount / 1e12) {
       console.log('Not enough liquidity');
       vm.expectRevert(BeefyVaultPSM.NotEnoughLiquidity.selector);
-      psm.withdraw();
+      _psm.withdraw();
     } else if (_withdrawAmount > _depositAmount * 10 ** 12) {
       console.log('Withdraw amount too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.withdraw();
-    } else if (_withdrawAmount < psm.minimumWithdrawalFee() || _withdrawAmount > psm.maxWithdraw()) {
+      _psm.withdraw();
+    } else if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
       console.log('Invalid amount');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
-      psm.withdraw();
+      _psm.withdraw();
     } else {
       vm.expectEmit(false, false, false, false);
       emit Withdrawn(_user, _withdrawAmount);
-      psm.withdraw();
+      console.log('owner:                     ', _owner);
+      console.log('user:                      ', _user);
+      uint256 _amtBefore = _usdbcToken.balanceOf(_owner);
+      uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
+      _psm.withdraw();
+      uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount / 1e12, false);
+      uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
+      uint256 _amtAfter = _usdbcToken.balanceOf(_owner);
+
+      console.log('_usdcTokenAddress:         ', address(_usdbcToken));
+      console.log('maiBalanceBefore:          ', _maiBalanceBefore);
+      console.log('maiBalanceAfter:           ', _maiBalanceAfter);
+      console.log('amtBefore:                 ', _amtBefore);
+      console.log('amtAfter:                  ', _amtAfter);
+      console.log('amtDiff:                   ', _amtAfter - _amtBefore);
+      console.log('withdrawFee:               ', _withdrawFee);
+      console.log('withdrawAmount:            ', _withdrawAmount / 1e12);
+      console.log('withdrawDiff:              ', _withdrawAmount / 1e12 - _withdrawFee);
+      assertApproxEqAbs(
+        _amtAfter - _amtBefore,
+        _withdrawAmount / 1e12 - _withdrawFee,
+        100,
+        'Users token balance should increase by the withdrawal amount'
+      );
+      assertApproxEqAbs(
+        _maiBalanceBefore,
+        _maiToken.balanceOf(_owner),
+        100,
+        'Users MAI balance should decrease by the withdrawal amount'
+      );
       assertGe(_usdbcToken.balanceOf(_user), _withdrawAmount / 1e12);
-      assertGe(_mooToken.balanceOf(address(psm)), 0);
-      uint256 depositFee = psm.calculateFee(_depositAmount, false);
-      uint256 withdrawFee = psm.calculateFee(_withdrawAmount / 1e12, false);
-      psm.claimFees();
-      console.log('withdrawAmount:             ', _withdrawAmount / 1e12);
-      console.log('depositAmount:              ', _depositAmount);
-      console.log('depositFee:                 ', depositFee);
-      console.log('withdrawFee:                ', withdrawFee);
+      assertGe(_mooToken.balanceOf(address(_psm)), 0);
+      _psm.claimFees();
       //                                    depositAmount   withdrawFee
-      psm.setUpgrade();
+      _psm.setUpgrade();
       vm.warp(block.timestamp + 4 days);
-      psm.transferToken(address(_mooToken), address(_owner), _mooToken.balanceOf(address(psm)));
-      assertApproxEqAbs(_mooToken.balanceOf(address(psm)), 0, 100, 'mooToken balance should be 0');
+      _psm.transferToken(address(_mooToken), address(_owner), _mooToken.balanceOf(address(_psm)));
+      assertApproxEqAbs(_mooToken.balanceOf(address(_psm)), 0, 100, 'mooToken balance should be 0');
     }
   }
 }
