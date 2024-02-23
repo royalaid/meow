@@ -8,7 +8,7 @@ import {BeefyVaultPSM} from '../../contracts/BeefyVaultDDW.sol';
 import 'forge-std/console.sol';
 import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
 
-contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
+contract PsmWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet() public {
     _psm = new BeefyVaultPSM();
     _psm.initialize(address(_mooToken), 100, 100);
@@ -30,8 +30,53 @@ contract UnitBeefyVaultWithdrawalConstructor is BeefyIntegrationBase {
   }
 }
 
-contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
+contract PsmAdminSuite is PsmWithdrawalConstructor {
+  function test_TransferOwnership() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+
+    vm.expectRevert(BeefyVaultPSM.NewOwnerCannotBeZeroAddress.selector);
+    _psm.transferOwnership(address(0x0));
+
+    _psm.transferOwnership(address(_user));
+    assertEq(_psm.owner(), address(_user));
+
+    vm.expectRevert(BeefyVaultPSM.CallerIsNotOwner.selector);
+    _psm.transferOwnership(address(0));
+  }
+
+  function test_UpdateMaxDepositWithdraw() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 200);
+
+    _psm.updateMax(200, 3000);
+    assertEq(_psm.maxDeposit(), 200);
+    assertEq(_psm.maxWithdraw(), 3000);
+  }
+
+  function test_UpdateFeesBP() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+
+    assertEq(_psm.depositFee(), 100);
+    assertEq(_psm.withdrawalFee(), 100);
+    _psm.updateFeesBP(200, 200);
+    assertEq(_psm.depositFee(), 200);
+    assertEq(_psm.withdrawalFee(), 200);
+  }
+}
+
+contract PsmDepositSuite is PsmWithdrawalConstructor {
   event Deposited(address indexed user, uint256 amount);
+
+  function test_Initialized() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+
+    assertEq(_psm.initialized(), true);
+    vm.expectRevert();
+    _psm.initialize(address(_mooToken), 100, 100);
+  }
 
   function test_RevertIfPaused() public {
     _psm.setPaused(BeefyVaultPSM.deposit.selector, true);
@@ -109,7 +154,7 @@ contract DepositSuite is UnitBeefyVaultWithdrawalConstructor {
   }
 }
 
-contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
+contract PsmWithdrawSuite is PsmWithdrawalConstructor {
   event Withdrawn(address indexed user, uint256 amount);
 
   function test_RevertIfPaused() public {
@@ -117,6 +162,23 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
 
     vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
     _psm.scheduleWithdraw(1000);
+  }
+
+  function test_DoubleWithdrawReverts() public {
+    _psm.scheduleWithdraw(100e18);
+    vm.expectRevert(BeefyVaultPSM.WithdrawalAlreadyScheduled.selector);
+    _psm.scheduleWithdraw(100e18);
+  }
+
+  function test_Withdraw_BeforeEpochReverts() public {
+    _psm.scheduleWithdraw(100e18);
+    vm.expectRevert(BeefyVaultPSM.WithdrawalNotAvailable.selector);
+    _psm.withdraw();
+  }
+
+  function test_Withdraw_NoScheduledWithdrawalReverts() public {
+    vm.expectRevert(BeefyVaultPSM.WithdrawalNotAvailable.selector);
+    _psm.withdraw();
   }
 
   function test_DepositAndWithdraw(uint256 _depositAmount, uint256 _withdrawAmount) public {
@@ -220,7 +282,13 @@ contract WithdrawSuite is UnitBeefyVaultWithdrawalConstructor {
       _psm.setUpgrade();
       vm.warp(block.timestamp + 4 days);
       _psm.transferToken(address(_mooToken), address(_owner), _mooToken.balanceOf(address(_psm)));
-      assertApproxEqAbs(_mooToken.balanceOf(address(_psm)), 0, 100, 'mooToken balance should be 0');
+      assertEq(_mooToken.balanceOf(address(_psm)), 0, 'mooToken balance should be 0');
+
+      _psm.transferToken(address(_usdbcToken), address(_owner), _usdbcToken.balanceOf(address(_psm)));
+      assertEq(_usdbcToken.balanceOf(address(_psm)), 0, 'USDC balance should be 0');
+
+      _psm.withdrawMAI();
+      assertEq(_maiToken.balanceOf(address(_psm)), 0, 'MAI balance should be 0');
     }
   }
 }

@@ -94,6 +94,7 @@ contract BeefyVaultPSM {
     underlying = _beef.want();
     decimalDifference = uint256(_beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
+    initialized = true;
     approveBeef();
   }
 
