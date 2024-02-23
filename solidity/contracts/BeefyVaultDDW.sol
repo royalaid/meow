@@ -46,6 +46,7 @@ contract BeefyVaultPSM {
   error NewOwnerCannotBeZeroAddress();
   error WithdrawalNotAvailable();
   error NotEnoughLiquidity();
+  error UpgradeNotScheduled();
 
   // Events
   event Deposited(address indexed _user, uint256 _amount);
@@ -111,6 +112,9 @@ contract BeefyVaultPSM {
     totalStableLiquidity += _amount;
     IBeefy(gem).depositAll();
 
+    if (IERC20(MAI_ADDRESS).balanceOf(address(this)) < _amount * (10 ** (decimalDifference))) {
+      revert InsufficientMAIBalance();
+    }
     IERC20(MAI_ADDRESS).transfer(msg.sender, _amount * (10 ** (decimalDifference)));
     emit Deposited(msg.sender, _amount);
   }
@@ -137,7 +141,9 @@ contract BeefyVaultPSM {
   }
 
   function withdraw() external pausable {
-    console.log('msg.sender:                ', msg.sender);
+    console.log('withdrawalEpoch[msg.sender]:     ', withdrawalEpoch[msg.sender]);
+    console.log('block.timestamp:                 ', block.timestamp);
+    console.log('msg.sender:                      ', msg.sender);
     if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
       revert WithdrawalNotAvailable();
     }
@@ -155,22 +161,11 @@ contract BeefyVaultPSM {
     // get shares from an amount
     uint256 _freshShares = _calculateAmountToShares(_amount);
     uint256 _freshSharesRounded = (_freshShares / (10 ** decimalDifference));
-    uint256 _shares = (_amount * (10 ** 6)) / _beef.getPricePerFullShare();
-    console.log('shares:                    ', _shares);
-    console.log('sharesInContract:          ', _beef.balanceOf(address(this)));
-    console.log('shareValueUsd:             ', (_beef.getPricePerFullShare() * _shares) / (10 ** 6));
-    console.log('amount:                    ', _amount);
-    console.log('freshShareValueUsd:        ', (_beef.getPricePerFullShare() * _freshSharesRounded) / (10 ** 6));
-    console.log('freshShares:               ', _freshSharesRounded);
 
     _beef.withdraw(_freshSharesRounded);
 
     totalStableLiquidity -= _toWithdraw;
-    console.log('underlying:                ', address(underlying));
-    console.log('usdbc before:              ', IERC20(underlying).balanceOf(msg.sender));
-    bool _suc = IERC20(underlying).transfer(msg.sender, _toWithdrawwFee);
-    console.log('suc:                       ', _suc);
-    console.log('usdbc after:               ', IERC20(underlying).balanceOf(msg.sender));
+    IERC20(underlying).transfer(msg.sender, _toWithdrawwFee);
 
     emit Withdrawn(msg.sender, _amount);
   }
@@ -189,14 +184,12 @@ contract BeefyVaultPSM {
     IBeefy _beef = IBeefy(gem);
     // get total balance in underlying
     uint256 _shares = _beef.balanceOf(address(this));
-    uint256 _totalStoredInUsd = _calculateSharesToAmount(_shares) / (10 ** decimalDifference);
+    uint256 _totalStoredInUsd = _calculateSharesToAmount(_shares);
     uint256 _totalStableShares = _calculateAmountToShares(totalStableLiquidity) / (10 ** decimalDifference);
-    console.log('totalStableLiquidity:      ', totalStableLiquidity);
-    console.log('totalStoredInUsd:          ', _totalStoredInUsd);
-    console.log('totalStableShares:         ', _totalStableShares);
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
       _beef.withdraw(_shares - _totalStableShares);
+      emit FeesWithdrawn(msg.sender, _fees);
       IERC20(underlying).transfer(msg.sender, _fees / (10 ** decimalDifference));
     }
   }
@@ -222,6 +215,8 @@ contract BeefyVaultPSM {
   function transferToken(address _token, address _to, uint256 _amount) external onlyOwner {
     if (stopped && block.timestamp > upgradeTime) {
       IERC20(_token).transfer(_to, _amount);
+    } else {
+      revert UpgradeNotScheduled();
     }
   }
 

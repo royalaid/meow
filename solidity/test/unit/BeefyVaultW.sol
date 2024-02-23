@@ -7,6 +7,7 @@ import {IBeefy} from '../../interfaces/IBeefy.sol';
 import {BeefyVaultPSM} from '../../contracts/BeefyVaultDDW.sol';
 import 'forge-std/console.sol';
 import {BeefyIntegrationBase} from '../integration/BeefyIntegrationBase.sol';
+import {StdCheats} from 'forge-std/StdCheats.sol';
 
 contract PsmWithdrawalConstructor is BeefyIntegrationBase {
   function test_OwnerSet() public {
@@ -31,6 +32,8 @@ contract PsmWithdrawalConstructor is BeefyIntegrationBase {
 }
 
 contract PsmAdminSuite is PsmWithdrawalConstructor {
+  event FeesWithdrawn(address indexed owner, uint256 feesEarned);
+
   function test_TransferOwnership() public {
     _psm = new BeefyVaultPSM();
     _psm.initialize(address(_mooToken), 100, 100);
@@ -64,6 +67,47 @@ contract PsmAdminSuite is PsmWithdrawalConstructor {
     assertEq(_psm.depositFee(), 200);
     assertEq(_psm.withdrawalFee(), 200);
   }
+
+  function test_UpdateMinimumFees() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+    _psm.updateMinimumFees(200, 200);
+    assertEq(_psm.minimumDepositFee(), 200);
+    assertEq(_psm.minimumWithdrawalFee(), 200);
+  }
+
+  function test_ClaimFees() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+    _beefyVault = IBeefy(address(_mooToken));
+
+    vm.startPrank(_owner);
+    deal(address(_usdbcToken), _owner, 10_000_000_000 * 10 ** 6);
+    deal(address(_maiToken), address(_psm), 10_000_000_000 * 10 ** 18);
+    _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
+    console.log('usdc balance:', _usdbcToken.balanceOf(_owner));
+    _psm.deposit(1000 * 10 ** 6);
+
+    _usdbcToken.approve(address(_beefyVault), 1000 * 10 ** 6);
+    _beefyVault.deposit(1000 * 10 ** 6);
+    _mooToken.transfer(address(_psm), _mooToken.balanceOf(_owner));
+
+    emit FeesWithdrawn(_owner, 0);
+    vm.expectEmit(true, false, false, false);
+    _psm.claimFees();
+  }
+
+  function test_TransferTokenWithoutUpgradeSet() public {
+    deal(address(_mooToken), address(_psm), 1000 * 10 ** 18);
+    uint256 _mooTokenBalance = _mooToken.balanceOf(address(_psm));
+    console.log('transferToken mooToken balance:', _mooTokenBalance);
+    vm.expectRevert(BeefyVaultPSM.UpgradeNotScheduled.selector);
+    _psm.transferToken(address(_mooToken), address(_user), _mooTokenBalance);
+    _psm.setUpgrade();
+    vm.warp(block.timestamp + 4 days);
+    _psm.transferToken(address(_mooToken), address(_user), _mooTokenBalance);
+    assertEq(_mooToken.balanceOf(address(_psm)), 0);
+  }
 }
 
 contract PsmDepositSuite is PsmWithdrawalConstructor {
@@ -87,6 +131,14 @@ contract PsmDepositSuite is PsmWithdrawalConstructor {
   function test_Deposit_ZeroAmountReverts() public {
     uint256 _amount = 0;
     vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+    _psm.deposit(_amount);
+  }
+
+  function test_Deposit_ZeroMaibalanceReverts() public {
+    uint256 _amount = 1000 * 10 ** 6;
+    _usdbcToken.approve(address(_psm), _amount);
+    _psm.withdrawMAI();
+    vm.expectRevert(BeefyVaultPSM.InsufficientMAIBalance.selector);
     _psm.deposit(_amount);
   }
 
