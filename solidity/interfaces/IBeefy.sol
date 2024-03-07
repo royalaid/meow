@@ -1,4 +1,4 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.19;
 
 interface IBeefy {
   function getPricePerFullShare() external view returns (uint256 _pricePerFullShare);

@@ -1,8 +1,8 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.19;
 
 import {IBeefy} from '../interfaces/IBeefy.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
-import {console} from 'forge-std/console.sol';
+// import {console} from 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -10,6 +10,7 @@ contract BeefyVaultPSM {
   address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
 
   uint256 public totalStableLiquidity;
+  uint256 public totalQueuedLiquidity;
   uint256 public depositFee;
   uint256 public withdrawalFee;
   uint256 public minimumDepositFee;
@@ -123,8 +124,16 @@ contract BeefyVaultPSM {
     if (withdrawalEpoch[msg.sender] != 0) {
       revert WithdrawalAlreadyScheduled();
     }
-    if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
 
+    uint256 _toWithdraw = _amount / (10 ** decimalDifference);
+    // console.log('amount:                   ', _amount);
+    // console.log('_toWithdraw:              ', _toWithdraw);
+    // console.log('totalStableLiquidity:     ', totalStableLiquidity);
+    // console.log('totalQueuedLiquidity:     ', totalQueuedLiquidity);
+
+    if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
+    if ((totalStableLiquidity - totalQueuedLiquidity) < _toWithdraw) revert NotEnoughLiquidity();
+    totalQueuedLiquidity += _toWithdraw;
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
@@ -141,9 +150,9 @@ contract BeefyVaultPSM {
   }
 
   function withdraw() external pausable {
-    console.log('withdrawalEpoch[msg.sender]:     ', withdrawalEpoch[msg.sender]);
-    console.log('block.timestamp:                 ', block.timestamp);
-    console.log('msg.sender:                      ', msg.sender);
+    // console.log('withdrawalEpoch[msg.sender]:     ', withdrawalEpoch[msg.sender]);
+    // console.log('block.timestamp:                 ', block.timestamp);
+    // console.log('msg.sender:                      ', msg.sender);
     if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
       revert WithdrawalNotAvailable();
     }
@@ -165,6 +174,8 @@ contract BeefyVaultPSM {
     _beef.withdraw(_freshSharesRounded);
 
     totalStableLiquidity -= _toWithdraw;
+    totalQueuedLiquidity -= _toWithdraw;
+
     IERC20(underlying).transfer(msg.sender, _toWithdrawwFee);
 
     emit Withdrawn(msg.sender, _amount);

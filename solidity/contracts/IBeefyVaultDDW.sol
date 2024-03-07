@@ -1,3 +1,5 @@
+pragma solidity 0.8.19;
+
 interface IBeefyVaultDelayWithdrawal {
   // Public variables
   function MAX_INT() external view returns (uint256);

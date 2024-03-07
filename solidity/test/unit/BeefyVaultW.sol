@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.19;
 
 import {IERC20} from 'isolmate/interfaces/tokens/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
@@ -217,12 +217,16 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
   }
 
   function test_DoubleWithdrawReverts() public {
+    _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
+    _psm.deposit(1000 * 10 ** 6);
     _psm.scheduleWithdraw(100e18);
     vm.expectRevert(BeefyVaultPSM.WithdrawalAlreadyScheduled.selector);
     _psm.scheduleWithdraw(100e18);
   }
 
   function test_Withdraw_BeforeEpochReverts() public {
+    _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
+    _psm.deposit(1000 * 10 ** 6);
     _psm.scheduleWithdraw(100e18);
     vm.expectRevert(BeefyVaultPSM.WithdrawalNotAvailable.selector);
     _psm.withdraw();
@@ -271,6 +275,11 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
       console.log('Withdraw Amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
+      _psm.scheduleWithdraw(_withdrawAmount);
+      return;
+    } else if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount / 1e12) {
+      console.log('Not enough liquidity');
+      vm.expectRevert(BeefyVaultPSM.NotEnoughLiquidity.selector);
       _psm.scheduleWithdraw(_withdrawAmount);
       return;
     } else {
