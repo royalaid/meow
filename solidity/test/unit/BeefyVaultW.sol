@@ -204,6 +204,18 @@ contract PsmDepositSuite is PsmWithdrawalConstructor {
       );
     }
   }
+
+  function test_DepositWithZeroFee() public {
+    BeefyVaultPSM __psm = new BeefyVaultPSM();
+    __psm.initialize(address(_mooToken), 0, 0);
+    __psm.updateMinimumFees(0, 0);
+    deal(address(_maiToken), address(__psm), 100_000_000 * 10 ** 18);
+    _usdbcToken.approve(address(__psm), 1000 * 10 ** 6);
+    __psm.deposit(1000 * 10 ** 6);
+    assertEq(_maiToken.balanceOf(address(_owner)), 1000 * 10 ** 18);
+    assertEq(__psm.depositFee(), 0);
+    assertEq(__psm.withdrawalFee(), 0);
+  }
 }
 
 contract PsmWithdrawSuite is PsmWithdrawalConstructor {
