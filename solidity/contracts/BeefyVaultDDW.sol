@@ -2,7 +2,6 @@ pragma solidity 0.8.19;
 
 import {IBeefy} from '../interfaces/IBeefy.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
-// import {console} from 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -104,7 +103,7 @@ contract BeefyVaultPSM {
     IERC20(underlying).approve(gem, MAX_INT);
   }
 
-  // user deposits tokens (6 decimals), withdraws stable
+  // user deposits tokens (6 decimals), withdraws stable 18 decimals
   function deposit(uint256 _amount) external pausable {
     if (_amount <= minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
     IERC20(underlying).transferFrom(msg.sender, address(this), _amount);
@@ -126,10 +125,6 @@ contract BeefyVaultPSM {
     }
 
     uint256 _toWithdraw = _amount / (10 ** decimalDifference);
-    // console.log('amount:                   ', _amount);
-    // console.log('_toWithdraw:              ', _toWithdraw);
-    // console.log('totalStableLiquidity:     ', totalStableLiquidity);
-    // console.log('totalQueuedLiquidity:     ', totalQueuedLiquidity);
 
     if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
     if ((totalStableLiquidity - totalQueuedLiquidity) < _toWithdraw) revert NotEnoughLiquidity();
@@ -221,7 +216,7 @@ contract BeefyVaultPSM {
   }
 
   function transferToken(address _token, address _to, uint256 _amount) external onlyOwner {
-    if (stopped && block.timestamp > upgradeTime) {
+    if (_token != gem || (stopped && block.timestamp > upgradeTime)) {
       IERC20(_token).transfer(_to, _amount);
     } else {
       revert UpgradeNotScheduled();
