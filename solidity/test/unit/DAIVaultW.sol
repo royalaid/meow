@@ -198,7 +198,7 @@ contract PsmDepositSuite is DaiPsmWithdrawalConstructor {
 
       assertEq(amtBefore - _amount, amtAfter, 'Users token balance should decrease by the deposit amount');
       assertEq(
-        (maiBalanceAfter - maiBalanceBefore) / 10 ** 12,
+        (maiBalanceAfter - maiBalanceBefore),
         _amount - expectedFee,
         'Users MAI balance should increase by the deposit amount minus the fee'
       );
@@ -276,7 +276,7 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
         _amtBefore, _amtAfter + _depositAmount, 10, 'Users token BALANCE should decrease by the deposit amount'
       );
       assertApproxEqAbs(
-        (_maiBalanceAfter - _maiBalanceBefore) / 10 ** 12,
+        (_maiBalanceAfter - _maiBalanceBefore),
         _depositAmount - _expectedFee,
         10,
         'Users MAI balance should increase by the deposit amount minus the fee'
@@ -290,7 +290,7 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
       _psm.scheduleWithdraw(_withdrawAmount);
       return;
-    } else if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount / 1e12) {
+    } else if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount) {
       console.log('Not enough liquidity');
       vm.expectRevert(DAIVaultPSM.NotEnoughLiquidity.selector);
       _psm.scheduleWithdraw(_withdrawAmount);
@@ -304,11 +304,11 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
     // Execute the withdrawal
     console.log('totalStableLiquidity:      ', _psm.totalStableLiquidity());
     console.log('withdrawAmount:            ', _withdrawAmount);
-    if (_psm.totalStableLiquidity() < _withdrawAmount / 1e12) {
+    if (_psm.totalStableLiquidity() < _withdrawAmount) {
       console.log('Not enough liquidity');
       vm.expectRevert(DAIVaultPSM.NotEnoughLiquidity.selector);
       _psm.withdraw();
-    } else if (_withdrawAmount > _depositAmount * 10 ** 12) {
+    } else if (_withdrawAmount > _depositAmount) {
       console.log('Withdraw amount too large');
       vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
       _psm.withdraw();
@@ -324,7 +324,7 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       uint256 _amtBefore = _WDAIToken.balanceOf(_owner);
       uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
       _psm.withdraw();
-      uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount / 1e12, false);
+      uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount, false);
       uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
       uint256 _amtAfter = _WDAIToken.balanceOf(_owner);
 
@@ -335,11 +335,11 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       console.log('amtAfter:                  ', _amtAfter);
       console.log('amtDiff:                   ', _amtAfter - _amtBefore);
       console.log('withdrawFee:               ', _withdrawFee);
-      console.log('withdrawAmount:            ', _withdrawAmount / 1e12);
-      console.log('withdrawDiff:              ', _withdrawAmount / 1e12 - _withdrawFee);
+      console.log('withdrawAmount:            ', _withdrawAmount);
+      console.log('withdrawDiff:              ', _withdrawAmount - _withdrawFee);
       assertApproxEqAbs(
         _amtAfter - _amtBefore,
-        _withdrawAmount / 1e12 - _withdrawFee,
+        _withdrawAmount - _withdrawFee,
         100,
         'Users token balance should increase by the withdrawal amount'
       );
@@ -349,7 +349,7 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
         100,
         'Users MAI balance should decrease by the withdrawal amount'
       );
-      assertGe(_WDAIToken.balanceOf(_user), _withdrawAmount / 1e12);
+      assertGe(_WDAIToken.balanceOf(_user), _withdrawAmount);
       assertGe(_l2dsr.balanceOf(address(_psm)), 0);
       _psm.claimFees();
       //                                    depositAmount   withdrawFee
