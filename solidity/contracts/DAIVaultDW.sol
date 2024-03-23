@@ -4,12 +4,13 @@ import {IL2DSR} from '../interfaces/IL2DSR.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
 import {console} from 'forge-std/console.sol';
 
-contract BeefyVaultPSM {
+contract DAIVaultPSM {
   uint256 public constant MAX_INT =
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
-  address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
+  address public constant MAI_ADDRESS = 0xf3B001D64C656e30a62fbaacA003B1336b4ce12A;
 
   uint256 public totalStableLiquidity;
+  uint256 public totalQueuedLiquidity;
   uint256 public depositFee;
   uint256 public withdrawalFee;
   uint256 public minimumDepositFee;
@@ -94,10 +95,10 @@ contract BeefyVaultPSM {
     underlying = _beef.asset();
     gem = _gem;
     initialized = true;
-    approveBeef();
+    approveGem();
   }
 
-  function approveBeef() public {
+  function approveGem() public {
     IERC20(underlying).approve(gem, MAX_INT);
   }
 
@@ -124,8 +125,11 @@ contract BeefyVaultPSM {
     if (withdrawalEpoch[msg.sender] != 0) {
       revert WithdrawalAlreadyScheduled();
     }
+
     if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
 
+    if ((totalStableLiquidity - totalQueuedLiquidity) < _amount) revert NotEnoughLiquidity();
+    totalQueuedLiquidity += _amount;
     scheduledWithdrawalAmount[msg.sender] = _amount;
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
@@ -151,6 +155,7 @@ contract BeefyVaultPSM {
     IL2DSR l2dsr = IL2DSR(gem);
 
     totalStableLiquidity -= _toWithdraw;
+    totalQueuedLiquidity -= _toWithdraw;
 
     // This would withdraw and transfer to user
 
@@ -176,8 +181,8 @@ contract BeefyVaultPSM {
     uint256 _totalStoredInUsd = _beef.totalAssets();
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
-      emit FeesWithdrawn(msg.sender, _fees);
       _beef.withdraw(_shares - totalStableLiquidity, msg.sender, address(this));
+      emit FeesWithdrawn(msg.sender, _fees);
       // directly sends the owner the amount
     }
   }
