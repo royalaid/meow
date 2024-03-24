@@ -102,7 +102,8 @@ contract DAIVaultPSM {
     IERC20(underlying).approve(gem, MAX_INT);
   }
 
-  // user deposits tokens (6 decimals), withdraws stable
+  /// @notice User deposits tokens with 6 decimals and withdraws stablecoin
+  /// @param _amount The amount of tokens to deposit
   function deposit(uint256 _amount) external pausable {
     if (_amount <= minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
     IERC20 iunder = IERC20(underlying);
@@ -121,6 +122,8 @@ contract DAIVaultPSM {
     emit Deposited(msg.sender, _amount);
   }
 
+  /// @notice Schedules a withdrawal of stablecoin
+  /// @param _amount The amount of stablecoin to withdraw
   function scheduleWithdraw(uint256 _amount) external pausable {
     if (withdrawalEpoch[msg.sender] != 0) {
       revert WithdrawalAlreadyScheduled();
@@ -135,6 +138,7 @@ contract DAIVaultPSM {
     emit WithdrawalScheduled(msg.sender, _amount);
   }
 
+  /// @notice Withdraws scheduled stablecoin after the withdrawal epoch
   function withdraw() external pausable {
     console.log('withdrawalEpoch[msg.sender]:     ', withdrawalEpoch[msg.sender]);
     console.log('block.timestamp:                 ', block.timestamp);
@@ -164,6 +168,10 @@ contract DAIVaultPSM {
     emit Withdrawn(msg.sender, _amount);
   }
 
+  /// @notice Calculates the fee for deposit or withdrawal
+  /// @param _amount The amount to calculate the fee on
+  /// @param _deposit Boolean indicating if the fee is for a deposit (true) or withdrawal (false)
+  /// @return _fee The calculated fee
   function calculateFee(uint256 _amount, bool _deposit) public view returns (uint256 _fee) {
     if (_deposit) {
       _fee = _amount * depositFee / 10_000;
@@ -174,6 +182,7 @@ contract DAIVaultPSM {
     }
   }
 
+  /// @notice Allows the owner to claim fees accumulated in the contract
   function claimFees() external onlyOwner {
     IL2DSR _beef = IL2DSR(gem);
     // get total balance in underlying
@@ -187,17 +196,23 @@ contract DAIVaultPSM {
     }
   }
 
+  /// @notice Sets a function selector to paused or unpaused
+  /// @param _selector The function selector to pause or unpause
+  /// @param _paused Boolean indicating if the function should be paused (true) or unpaused (false)
   function setPaused(bytes4 _selector, bool _paused) external onlyOwner {
     paused[_selector] = _paused;
     emit PauseEvent(msg.sender, _selector, _paused);
   }
 
+  /// @notice Transfers ownership of the contract to a new owner
+  /// @param _newOwner The address of the new owner
   function transferOwnership(address _newOwner) external onlyOwner {
     if (_newOwner == address(0)) revert NewOwnerCannotBeZeroAddress();
     owner = _newOwner;
     emit OwnerUpdated(_newOwner);
   }
 
+  /// @notice Prepares the contract for an upgrade
   function setUpgrade() external onlyOwner {
     if (!stopped) {
       stopped = true;
@@ -205,6 +220,10 @@ contract DAIVaultPSM {
     }
   }
 
+  /// @notice Allows the owner to transfer tokens from the contract
+  /// @param _token The address of the token to transfer
+  /// @param _to The address to transfer the tokens to
+  /// @param _amount The amount of tokens to transfer
   function transferToken(address _token, address _to, uint256 _amount) external onlyOwner {
     if (stopped && block.timestamp > upgradeTime) {
       IERC20(_token).transfer(_to, _amount);
@@ -213,23 +232,33 @@ contract DAIVaultPSM {
     }
   }
 
+  /// @notice Allows the owner to withdraw MAI tokens from the contract
   function withdrawMAI() external onlyOwner {
     IERC20 _mai = IERC20(MAI_ADDRESS);
     _mai.transfer(msg.sender, _mai.balanceOf(address(this)));
   }
 
+  /// @notice Updates the minimum fees for deposit and withdrawal
+  /// @param _newMinimumDepositFee The new minimum deposit fee
+  /// @param _newMinimumWithdrawalFee The new minimum withdrawal fee
   function updateMinimumFees(uint256 _newMinimumDepositFee, uint256 _newMinimumWithdrawalFee) external onlyOwner {
     minimumDepositFee = _newMinimumDepositFee;
     minimumWithdrawalFee = _newMinimumWithdrawalFee;
     emit MinimumFeesUpdated(_newMinimumDepositFee, _newMinimumWithdrawalFee);
   }
 
+  /// @notice Updates the deposit and withdrawal fees in basis points
+  /// @param _newDepositFee The new deposit fee in basis points
+  /// @param _newWithdrawalFee The new withdrawal fee in basis points
   function updateFeesBP(uint256 _newDepositFee, uint256 _newWithdrawalFee) external onlyOwner {
     depositFee = _newDepositFee;
     withdrawalFee = _newWithdrawalFee;
     emit FeesUpdated(_newDepositFee, _newWithdrawalFee);
   }
 
+  /// @notice Updates the maximum deposit and withdrawal limits
+  /// @param _maxDeposit The new maximum deposit limit
+  /// @param _maxWithdraw The new maximum withdrawal limit
   function updateMax(uint256 _maxDeposit, uint256 _maxWithdraw) external onlyOwner {
     maxDeposit = _maxDeposit;
     maxWithdraw = _maxWithdraw;
