@@ -186,11 +186,11 @@ contract DAIVaultPSM {
   function claimFees() external onlyOwner {
     IL2DSR _beef = IL2DSR(gem);
     // get total balance in underlying
-    uint256 _shares = _beef.balanceOf(address(this));
+    //uint256 _shares = _beef.balanceOf(address(this));
     uint256 _totalStoredInUsd = _beef.totalAssets();
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
-      _beef.withdraw(_shares - totalStableLiquidity, msg.sender, address(this));
+      _beef.withdraw(_totalStoredInUsd - totalStableLiquidity, msg.sender, address(this));
       emit FeesWithdrawn(msg.sender, _fees);
       // directly sends the owner the amount
     }
