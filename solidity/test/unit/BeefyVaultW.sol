@@ -229,11 +229,17 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
   }
 
   function test_DoubleWithdrawReverts() public {
+    vm.startPrank(_owner);
     _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
     _psm.deposit(1000 * 10 ** 6);
-    _psm.scheduleWithdraw(100e18);
+    console.log('msg.sender:', msg.sender);
+    console.log('owner:', _owner);
+    console.log('usdbc balance before:', _usdbcToken.balanceOf(_owner));
+    console.log('maiToken balance before:', _maiToken.balanceOf(_owner));
+    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
     vm.expectRevert(BeefyVaultPSM.WithdrawalAlreadyScheduled.selector);
-    _psm.scheduleWithdraw(100e18);
+    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
+    vm.stopPrank();
   }
 
   function test_Withdraw_BeforeEpochReverts() public {
@@ -282,6 +288,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       );
     }
     console.log('mooToken balance after:', _mooToken.balanceOf(address(_psm)));
+    uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
 
     // Schedule the withdrawal
     if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
@@ -296,6 +303,13 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       return;
     } else {
       _psm.scheduleWithdraw(_withdrawAmount);
+      uint256 _maiBalanceAfterSchedule = _maiToken.balanceOf(_owner);
+      assertApproxEqAbs(
+        _maiBalanceAfterSchedule,
+        _maiBalanceBefore - _withdrawAmount,
+        10,
+        'Users MAI balance should decrease by the withdrawal amount'
+      );
     }
 
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
@@ -321,7 +335,6 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       console.log('owner:                     ', _owner);
       console.log('user:                      ', _user);
       uint256 _amtBefore = _usdbcToken.balanceOf(_owner);
-      uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
       _psm.withdraw();
       uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount / 1e12, false);
       uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);

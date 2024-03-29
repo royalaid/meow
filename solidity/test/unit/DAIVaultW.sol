@@ -232,9 +232,10 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
   function test_DoubleWithdrawReverts() public {
     _WDAIToken.approve(address(_psm), 1000 ether);
     _psm.deposit(1000 ether);
-    _psm.scheduleWithdraw(100 ether);
+    console.log('maiToken balance before:', _maiToken.balanceOf(_owner));
+    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
     vm.expectRevert(DAIVaultPSM.WithdrawalAlreadyScheduled.selector);
-    _psm.scheduleWithdraw(100 ether);
+    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
   }
 
   function test_Withdraw_BeforeEpochReverts() public {
@@ -283,9 +284,15 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       );
     }
     console.log('WDAIToken balance after:', _WDAIToken.balanceOf(address(_psm)));
+    uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
 
     // Schedule the withdrawal
-    if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
+    if (_withdrawAmount > _maiToken.balanceOf(_owner)) {
+      console.log('Withdraw amount too large');
+      vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
+      _psm.scheduleWithdraw(_withdrawAmount);
+      return;
+    } else if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
       console.log('Withdraw Amount too small or too large');
       vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
       _psm.scheduleWithdraw(_withdrawAmount);
@@ -297,6 +304,13 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       return;
     } else {
       _psm.scheduleWithdraw(_withdrawAmount);
+      uint256 _maiBalanceAfterSchedule = _maiToken.balanceOf(_owner);
+      assertApproxEqAbs(
+        _maiBalanceAfterSchedule,
+        _maiBalanceBefore - _withdrawAmount,
+        10,
+        'Users MAI balance should decrease by the withdrawal amount'
+      );
     }
 
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
@@ -322,7 +336,6 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       console.log('owner:                     ', _owner);
       console.log('user:                      ', _user);
       uint256 _amtBefore = _WDAIToken.balanceOf(_owner);
-      uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
       _psm.withdraw();
       uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount, false);
       uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);

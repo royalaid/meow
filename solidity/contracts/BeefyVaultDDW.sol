@@ -2,6 +2,7 @@ pragma solidity 0.8.19;
 
 import {IBeefy} from '../interfaces/IBeefy.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
+import {console} from 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -130,6 +131,7 @@ contract BeefyVaultPSM {
     if ((totalStableLiquidity - totalQueuedLiquidity) < _toWithdraw) revert NotEnoughLiquidity();
     totalQueuedLiquidity += _toWithdraw;
     scheduledWithdrawalAmount[msg.sender] = _amount;
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
   }
@@ -188,12 +190,13 @@ contract BeefyVaultPSM {
     // get total balance in underlying
     uint256 _shares = _beef.balanceOf(address(this));
     uint256 _totalStoredInUsd = _calculateSharesToAmount(_shares);
-    uint256 _totalStableShares = _calculateAmountToShares(totalStableLiquidity) / (10 ** decimalDifference);
+    uint256 _totalStableShares = _calculateAmountToShares(totalStableLiquidity);
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
       _beef.withdraw(_shares - _totalStableShares);
       emit FeesWithdrawn(msg.sender, _fees);
-      IERC20(underlying).transfer(msg.sender, _fees / (10 ** decimalDifference));
+      IERC20 usdc = IERC20(underlying);
+      usdc.transfer(msg.sender, usdc.balanceOf(address(this)));
     }
   }
 

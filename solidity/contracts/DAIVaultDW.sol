@@ -2,7 +2,6 @@ pragma solidity 0.8.19;
 
 import {IL2DSR} from '../interfaces/IL2DSR.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
-import {console} from 'forge-std/console.sol';
 
 contract DAIVaultPSM {
   uint256 public constant MAX_INT =
@@ -64,7 +63,6 @@ contract DAIVaultPSM {
   event FeesUpdated(uint256 _newDepositFee, uint256 _newWithdrawalFee);
   event MaxUpdated(uint256 _maxDeposit, uint256 _maxWithdraw);
 
-  // target 0x9c4ec768c28520b50860ea7a15bd7213a9ff58bf
   constructor() {
     owner = msg.sender;
   }
@@ -85,8 +83,8 @@ contract DAIVaultPSM {
     }
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    minimumDepositFee = 1_000_000;
-    minimumWithdrawalFee = 1_000_000;
+    minimumDepositFee = 1 ether;
+    minimumWithdrawalFee = 1 ether;
 
     IL2DSR _beef = IL2DSR(_gem);
 
@@ -102,7 +100,7 @@ contract DAIVaultPSM {
     IERC20(underlying).approve(gem, MAX_INT);
   }
 
-  /// @notice User deposits tokens with 6 decimals and withdraws stablecoin
+  /// @notice User deposits tokens with 18 decimals and withdraws stablecoin
   /// @param _amount The amount of tokens to deposit
   function deposit(uint256 _amount) external pausable {
     if (_amount <= minimumDepositFee || _amount > maxDeposit) revert InvalidAmount();
@@ -134,15 +132,13 @@ contract DAIVaultPSM {
     if ((totalStableLiquidity - totalQueuedLiquidity) < _amount) revert NotEnoughLiquidity();
     totalQueuedLiquidity += _amount;
     scheduledWithdrawalAmount[msg.sender] = _amount;
+    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
   }
 
   /// @notice Withdraws scheduled stablecoin after the withdrawal epoch
   function withdraw() external pausable {
-    console.log('withdrawalEpoch[msg.sender]:     ', withdrawalEpoch[msg.sender]);
-    console.log('block.timestamp:                 ', block.timestamp);
-    console.log('msg.sender:                      ', msg.sender);
     if (withdrawalEpoch[msg.sender] == 0 || block.timestamp < withdrawalEpoch[msg.sender]) {
       revert WithdrawalNotAvailable();
     }
@@ -162,7 +158,6 @@ contract DAIVaultPSM {
     totalQueuedLiquidity -= _toWithdraw;
 
     // This would withdraw and transfer to user
-
     l2dsr.withdraw(_toWithdrawwFee, msg.sender, address(this));
 
     emit Withdrawn(msg.sender, _amount);
@@ -225,7 +220,7 @@ contract DAIVaultPSM {
   /// @param _to The address to transfer the tokens to
   /// @param _amount The amount of tokens to transfer
   function transferToken(address _token, address _to, uint256 _amount) external onlyOwner {
-    if (stopped && block.timestamp > upgradeTime) {
+    if (_token != gem || (stopped && block.timestamp > upgradeTime)) {
       IERC20(_token).transfer(_to, _amount);
     } else {
       revert UpgradeNotScheduled();
