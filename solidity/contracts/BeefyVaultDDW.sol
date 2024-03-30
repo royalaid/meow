@@ -2,7 +2,6 @@ pragma solidity 0.8.19;
 
 import {IBeefy} from '../interfaces/IBeefy.sol';
 import {IERC20} from '../interfaces/IERC20.sol';
-import {console} from 'forge-std/console.sol';
 
 contract BeefyVaultPSM {
   uint256 public constant MAX_INT =
@@ -131,7 +130,9 @@ contract BeefyVaultPSM {
     if ((totalStableLiquidity - totalQueuedLiquidity) < _toWithdraw) revert NotEnoughLiquidity();
     totalQueuedLiquidity += _toWithdraw;
     scheduledWithdrawalAmount[msg.sender] = _amount;
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
+
+    IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
+
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
   }

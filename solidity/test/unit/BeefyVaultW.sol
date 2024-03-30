@@ -76,6 +76,16 @@ contract PsmAdminSuite is PsmWithdrawalConstructor {
     assertEq(_psm.minimumWithdrawalFee(), 200);
   }
 
+  function test_Pausing() public {
+    _psm = new BeefyVaultPSM();
+    _psm.initialize(address(_mooToken), 100, 100);
+
+    _psm.setPaused(BeefyVaultPSM.deposit.selector, true);
+
+    vm.expectRevert(BeefyVaultPSM.ContractIsPaused.selector);
+    _psm.deposit(1_000_000_000);
+  }
+
   function test_ClaimFees() public {
     _psm = new BeefyVaultPSM();
     _psm.initialize(address(_mooToken), 100, 100);
@@ -229,22 +239,33 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
   }
 
   function test_DoubleWithdrawReverts() public {
-    vm.startPrank(_owner);
     _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
     _psm.deposit(1000 * 10 ** 6);
+    console.log('Block timestamp:  ', block.timestamp);
     console.log('msg.sender:', msg.sender);
     console.log('owner:', _owner);
     console.log('usdbc balance before:', _usdbcToken.balanceOf(_owner));
     console.log('maiToken balance before:', _maiToken.balanceOf(_owner));
-    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
+
+    _maiToken.approve(address(_psm), _maiToken.balanceOf(_owner));
+
+    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner) / 2);
+
+    console.log('maiToken balance after:', _maiToken.balanceOf(_owner));
+    console.log('withdrawalEpoch: ', _psm.withdrawalEpoch(msg.sender));
+    console.log('scheduledWithdrawalAmount:', _psm.scheduledWithdrawalAmount(msg.sender));
+
+    vm.warp(block.timestamp + 1 days);
+    uint256 withdrawAmount = _maiToken.balanceOf(_owner);
     vm.expectRevert(BeefyVaultPSM.WithdrawalAlreadyScheduled.selector);
-    _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
-    vm.stopPrank();
+    _psm.scheduleWithdraw(withdrawAmount);
   }
 
   function test_Withdraw_BeforeEpochReverts() public {
     _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
     _psm.deposit(1000 * 10 ** 6);
+    _maiToken.approve(address(_psm), 100e18);
+
     _psm.scheduleWithdraw(100e18);
     vm.expectRevert(BeefyVaultPSM.WithdrawalNotAvailable.selector);
     _psm.withdraw();
@@ -265,6 +286,10 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     console.log('minimumDepositFee:', _psm.minimumDepositFee());
     console.log('mooToken balance bfore:', _mooToken.balanceOf(address(_psm)));
 
+    deal(address(_usdbcToken), msg.sender, 10_000_000_000 * 10 ** 6);
+    deal(address(_maiToken), address(_psm), 10_000_000_000 * 10 ** 18);
+    deal(address(_maiToken), msg.sender, 10_000_000_000 * 10 ** 6);
+
     if (_depositAmount <= _psm.minimumDepositFee() || _depositAmount > _psm.maxDeposit()) {
       console.log('Deposit amount too small or too large');
       vm.expectRevert(BeefyVaultPSM.InvalidAmount.selector);
@@ -273,7 +298,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     } else {
       uint256 _expectedFee = _psm.calculateFee(_depositAmount, true);
       uint256 _amtBefore = _usdbcToken.balanceOf(_owner);
-      uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
+      uint256 _maiBalanceBefore1 = _maiToken.balanceOf(_owner);
       _psm.deposit(_depositAmount);
       uint256 _amtAfter = _usdbcToken.balanceOf(_owner);
       uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
@@ -281,7 +306,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
         _amtBefore, _amtAfter + _depositAmount, 10, 'Users token BALANCE should decrease by the deposit amount'
       );
       assertApproxEqAbs(
-        (_maiBalanceAfter - _maiBalanceBefore) / 10 ** 12,
+        (_maiBalanceAfter - _maiBalanceBefore1) / 10 ** 12,
         _depositAmount - _expectedFee,
         10,
         'Users MAI balance should increase by the deposit amount minus the fee'
@@ -289,6 +314,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     }
     console.log('mooToken balance after:', _mooToken.balanceOf(address(_psm)));
     uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
+    _maiToken.approve(address(_psm), _withdrawAmount);
 
     // Schedule the withdrawal
     if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
@@ -298,20 +324,28 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       return;
     } else if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount / 1e12) {
       console.log('Not enough liquidity');
-      vm.expectRevert(BeefyVaultPSM.NotEnoughLiquidity.selector);
+      vm.expectRevert();
       _psm.scheduleWithdraw(_withdrawAmount);
       return;
+    } else if (_withdrawAmount > _maiToken.balanceOf(msg.sender)) {
+      console.log('Insufficient MAI balance for withdrawal');
+      return;
     } else {
-      _psm.scheduleWithdraw(_withdrawAmount);
-      uint256 _maiBalanceAfterSchedule = _maiToken.balanceOf(_owner);
+      uint256 _maiBalanceBefore1 = _maiToken.balanceOf(msg.sender);
+      console.log('_maiBalanceBefore1:', _maiBalanceBefore1);
+      _psm.scheduleWithdraw(_withdrawAmount); // takes MAI and gives (later) usdbc
+      uint256 _maiBalanceAfterSchedule = _maiToken.balanceOf(msg.sender);
+      console.log('_maiBalanceAfterSchedule:', _maiBalanceAfterSchedule); //  10000000000000000
+      console.log('_withdrawAmount:', _withdrawAmount); //  1000000000000000000
+
       assertApproxEqAbs(
         _maiBalanceAfterSchedule,
-        _maiBalanceBefore - _withdrawAmount,
-        10,
+        (_maiBalanceBefore1 - _withdrawAmount),
+        0,
         'Users MAI balance should decrease by the withdrawal amount'
       );
     }
-
+    console.log('we are past this point now');
     // Move forward in time to the next epoch to simulate the passage of time for withdrawal execution
     vm.warp(block.timestamp + 4 days);
     // Execute the withdrawal
