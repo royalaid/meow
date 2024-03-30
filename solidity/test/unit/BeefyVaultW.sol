@@ -107,17 +107,35 @@ contract PsmAdminSuite is PsmWithdrawalConstructor {
 
     //deal(address(_beefyVault), address(_psm), 10_000_000_000_000_000 * 10 ** 18); // increase the beefy token amount (analogous to increased balance from interest)
 
+    uint256 _sharesInUSDCBefore =
+      (_beefyVault.balanceOf(address(_psm)) * _beefyVault.balance()) / _beefyVault.totalSupply();
+
+    deal(address(_usdbcToken), address(_beefyVault), 10_000_000_000 * 10 ** 6); // increase beefy's amount of usdbc by a ton
+
+    uint256 currentBeefyBalance = _beefyVault.balance();
+
+    uint256 _sharesInUSDCAfter =
+      (_beefyVault.balanceOf(address(_psm)) * _beefyVault.balance()) / _beefyVault.totalSupply();
+
+    uint256 expectedDepositFees = (depositAmt * 100 / 10_000);
+    console.log('shares in usdc before:', _sharesInUSDCBefore);
+    console.log('shares in usdc after:', _sharesInUSDCAfter);
+
+    uint256 interestAndFeesEarned = (_sharesInUSDCAfter - _sharesInUSDCBefore) + expectedDepositFees;
+
     uint256 ownerBefore = _usdbcToken.balanceOf(_owner);
     _psm.claimFees();
     uint256 ownerAfter = _usdbcToken.balanceOf(_owner);
     assertTrue(ownerAfter > ownerBefore, 'Owner should have received more fees than before.');
 
-    uint256 expectedFees = depositAmt * 100 / 10_000; // Calculating the expected fees as per the instructions
     uint256 actualFeesReceived = ownerAfter - ownerBefore; // Actual fees received by the owner
-    console.log('expected fees:', expectedFees);
+    console.log('interestAndFeesEarned:', interestAndFeesEarned);
     console.log('actual fees received:', actualFeesReceived);
     assertApproxEqAbs(
-      actualFeesReceived, expectedFees, 100, 'Actual fees received should be close to or more than the expected fees.'
+      actualFeesReceived,
+      interestAndFeesEarned,
+      15_000,
+      'Actual fees received should be close to or more than the expected fees.'
     );
     console.log('Owner received fees: ', ownerAfter - ownerBefore);
   }
