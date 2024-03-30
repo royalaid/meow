@@ -88,23 +88,38 @@ contract PsmAdminSuite is PsmWithdrawalConstructor {
 
   function test_ClaimFees() public {
     _psm = new BeefyVaultPSM();
-    _psm.initialize(address(_mooToken), 100, 100);
+    _psm.initialize(address(_mooToken), 100, 100); // 100/1000 so 0.1
     _beefyVault = IBeefy(address(_mooToken));
 
     vm.startPrank(_owner);
     deal(address(_usdbcToken), _owner, 10_000_000_000 * 10 ** 6);
-    deal(address(_maiToken), address(_psm), 10_000_000_000 * 10 ** 18);
+    deal(address(_maiToken), address(_psm), 10_000_000_000_000 * 10 ** 18);
     _usdbcToken.approve(address(_psm), 1000 * 10 ** 6);
+
     console.log('usdc balance:', _usdbcToken.balanceOf(_owner));
     _psm.deposit(1000 * 10 ** 6);
+    //9.999999
+    //
+    uint256 depositAmt = 1000 * 10 ** 6;
 
-    _usdbcToken.approve(address(_beefyVault), 1000 * 10 ** 6);
+    _usdbcToken.approve(address(_beefyVault), depositAmt); // 1000 usd
     _beefyVault.deposit(1000 * 10 ** 6);
-    _mooToken.transfer(address(_psm), _mooToken.balanceOf(_owner));
 
-    emit FeesWithdrawn(_owner, 0);
-    vm.expectEmit(true, false, false, false);
+    //deal(address(_beefyVault), address(_psm), 10_000_000_000_000_000 * 10 ** 18); // increase the beefy token amount (analogous to increased balance from interest)
+
+    uint256 ownerBefore = _usdbcToken.balanceOf(_owner);
     _psm.claimFees();
+    uint256 ownerAfter = _usdbcToken.balanceOf(_owner);
+    assertTrue(ownerAfter > ownerBefore, 'Owner should have received more fees than before.');
+
+    uint256 expectedFees = depositAmt * 100 / 10_000; // Calculating the expected fees as per the instructions
+    uint256 actualFeesReceived = ownerAfter - ownerBefore; // Actual fees received by the owner
+    console.log('expected fees:', expectedFees);
+    console.log('actual fees received:', actualFeesReceived);
+    assertApproxEqAbs(
+      actualFeesReceived, expectedFees, 100, 'Actual fees received should be close to or more than the expected fees.'
+    );
+    console.log('Owner received fees: ', ownerAfter - ownerBefore);
   }
 
   function test_TransferTokenWithoutUpgradeSet() public {
@@ -397,6 +412,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       );
       assertGe(_usdbcToken.balanceOf(_user), _withdrawAmount / 1e12);
       assertGe(_mooToken.balanceOf(address(_psm)), 0);
+
       _psm.claimFees();
       //                                    depositAmount   withdrawFee
       _psm.setUpgrade();
