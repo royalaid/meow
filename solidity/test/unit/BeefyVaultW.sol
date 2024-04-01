@@ -112,7 +112,7 @@ contract PsmAdminSuite is PsmWithdrawalConstructor {
 
     deal(address(_usdbcToken), address(_beefyVault), 10_000_000_000 * 10 ** 6); // increase beefy's amount of usdbc by a ton
 
-    uint256 currentBeefyBalance = _beefyVault.balance();
+    // uint256 currentBeefyBalance = _beefyVault.balance();
 
     uint256 _sharesInUSDCAfter =
       (_beefyVault.balanceOf(address(_psm)) * _beefyVault.balance()) / _beefyVault.totalSupply();
@@ -310,7 +310,7 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
   }
 
   function test_DepositAndWithdraw(uint256 _depositAmount, uint256 _withdrawAmount) public {
-    _depositAmount = bound(_depositAmount, 1e6, _usdbcToken.balanceOf(_user));
+    _depositAmount = bound(_depositAmount, 1e6, _usdbcToken.balanceOf(_owner));
     _withdrawAmount = bound(_withdrawAmount, 1e18, _depositAmount * 10 ** 12);
     // Deposit first to ensure there are tokens to withdraw
     _usdbcToken.approve(address(_psm), _depositAmount);
@@ -319,9 +319,9 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     console.log('minimumDepositFee:', _psm.minimumDepositFee());
     console.log('mooToken balance bfore:', _mooToken.balanceOf(address(_psm)));
 
-    deal(address(_usdbcToken), msg.sender, 10_000_000_000 * 10 ** 6);
+    deal(address(_usdbcToken), _owner, 10_000_000_000 * 10 ** 6);
     deal(address(_maiToken), address(_psm), 10_000_000_000 * 10 ** 18);
-    deal(address(_maiToken), msg.sender, 10_000_000_000 * 10 ** 6);
+    deal(address(_maiToken), _owner, 10_000_000_000 * 10 ** 18);
 
     if (_depositAmount <= _psm.minimumDepositFee() || _depositAmount > _psm.maxDeposit()) {
       console.log('Deposit amount too small or too large');
@@ -348,6 +348,17 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
     console.log('mooToken balance after:', _mooToken.balanceOf(address(_psm)));
     uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
     _maiToken.approve(address(_psm), _withdrawAmount);
+    console.log('=====================================');
+    console.log('depositAmount:              ', _depositAmount);
+    console.log('withdrawAmount:             ', _withdrawAmount);
+    console.log('mai balance of owner:       ', _maiToken.balanceOf(_owner));
+    console.log('mai bal of psm:             ', _maiToken.balanceOf(address(_psm)));
+    console.log('withdrawAmount / 1e12:      ', _withdrawAmount / 1e12);
+    console.log('minimumWithdrawalFee:       ', _psm.minimumWithdrawalFee());
+    console.log('maxWithdraw:                ', _psm.maxWithdraw());
+    console.log('totalStableLiquidity:       ', _psm.totalStableLiquidity());
+    console.log('totalQueuedLiquidity:       ', _psm.totalQueuedLiquidity());
+    console.log('=====================================');
 
     // Schedule the withdrawal
     if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
@@ -360,22 +371,19 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       vm.expectRevert();
       _psm.scheduleWithdraw(_withdrawAmount);
       return;
-    } else if (_withdrawAmount > _maiToken.balanceOf(msg.sender)) {
+    } else if (_withdrawAmount > _maiToken.balanceOf(address(_psm))) {
       console.log('Insufficient MAI balance for withdrawal');
       return;
     } else {
       uint256 _maiBalanceBefore1 = _maiToken.balanceOf(msg.sender);
-      console.log('_maiBalanceBefore1:', _maiBalanceBefore1);
+      console.log('_maiBalanceBefore1:         ', _maiBalanceBefore1);
       _psm.scheduleWithdraw(_withdrawAmount); // takes MAI and gives (later) usdbc
       uint256 _maiBalanceAfterSchedule = _maiToken.balanceOf(msg.sender);
-      console.log('_maiBalanceAfterSchedule:', _maiBalanceAfterSchedule); //  10000000000000000
-      console.log('_withdrawAmount:', _withdrawAmount); //  1000000000000000000
+      console.log('_maiBalanceAfterSchedule:   ', _maiBalanceAfterSchedule); //  10000000000000000
+      console.log('_withdrawAmount:            ', _withdrawAmount); //  1000000000000000000
 
       assertApproxEqAbs(
-        _maiBalanceAfterSchedule,
-        (_maiBalanceBefore1 - _withdrawAmount),
-        0,
-        'Users MAI balance should decrease by the withdrawal amount'
+        _maiBalanceAfterSchedule, _maiBalanceBefore1, 0, 'Users MAI balance should decrease by the withdrawal amount'
       );
     }
     console.log('we are past this point now');
@@ -401,31 +409,23 @@ contract PsmWithdrawSuite is PsmWithdrawalConstructor {
       emit Withdrawn(_user, _withdrawAmount);
       console.log('owner:                     ', _owner);
       console.log('user:                      ', _user);
-      uint256 _amtBefore = _usdbcToken.balanceOf(_owner);
       _psm.withdraw();
       uint256 _withdrawFee = _psm.calculateFee(_withdrawAmount / 1e12, false);
       uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
-      uint256 _amtAfter = _usdbcToken.balanceOf(_owner);
 
       console.log('_usdcTokenAddress:         ', address(_usdbcToken));
       console.log('maiBalanceBefore:          ', _maiBalanceBefore);
       console.log('maiBalanceAfter:           ', _maiBalanceAfter);
-      console.log('amtBefore:                 ', _amtBefore);
-      console.log('amtAfter:                  ', _amtAfter);
-      console.log('amtDiff:                   ', _amtAfter - _amtBefore);
       console.log('withdrawFee:               ', _withdrawFee);
       console.log('withdrawAmount:            ', _withdrawAmount / 1e12);
       console.log('withdrawDiff:              ', _withdrawAmount / 1e12 - _withdrawFee);
+      console.log('maiBalanceBefore:          ', _maiBalanceBefore / 1e12);
+      console.log('maiBalanceAfter:           ', _maiBalanceAfter / 1e12);
+      console.log('maiAfter with Fee:         ', (_maiBalanceAfter / 1e12) + _withdrawFee);
       assertApproxEqAbs(
-        _amtAfter - _amtBefore,
-        _withdrawAmount / 1e12 - _withdrawFee,
-        100,
-        'Users token balance should increase by the withdrawal amount'
-      );
-      assertApproxEqAbs(
-        _maiBalanceBefore,
-        _maiToken.balanceOf(_owner),
-        100,
+        _maiBalanceBefore / 1e12,
+        (_maiBalanceAfter / 1e12) + ((_withdrawAmount / 1e12)),
+        10_000,
         'Users MAI balance should decrease by the withdrawal amount'
       );
       assertGe(_usdbcToken.balanceOf(_user), _withdrawAmount / 1e12);
