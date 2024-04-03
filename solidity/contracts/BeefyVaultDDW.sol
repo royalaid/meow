@@ -172,6 +172,7 @@ contract BeefyVaultPSM {
     totalQueuedLiquidity -= _toWithdraw;
 
     IERC20(underlying).transfer(msg.sender, _toWithdrawwFee);
+    _beef.depositAll();
 
     emit Withdrawn(msg.sender, _amount);
   }
