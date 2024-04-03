@@ -159,6 +159,10 @@ contract DAIVaultPSM {
 
     // This would withdraw and transfer to user
     l2dsr.withdraw(_toWithdrawwFee, msg.sender, address(this));
+    uint256 _remaining = IERC20(underlying).balanceOf(address(this));
+    if (_remaining > 0) {
+      l2dsr.deposit(_remaining, address(this));
+    }
 
     emit Withdrawn(msg.sender, _amount);
   }
@@ -181,7 +185,8 @@ contract DAIVaultPSM {
   function claimFees() external onlyOwner {
     IL2DSR _beef = IL2DSR(gem);
 
-    uint256 _totalStoredInUsd = _beef.totalAssets();
+    uint256 totalShares = _beef.balanceOf(address(this));
+    uint256 _totalStoredInUsd = _beef.convertToAssets(totalShares);
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC
       _beef.withdraw(_totalStoredInUsd - totalStableLiquidity, msg.sender, address(this));

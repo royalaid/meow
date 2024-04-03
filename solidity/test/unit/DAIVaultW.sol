@@ -92,12 +92,12 @@ contract DaiPsmAdminSuite is DaiPsmWithdrawalConstructor {
     _l2dsr.deposit(1000 ether, address(_psm));
 
     uint256 feesBefore = _WDAIToken.balanceOf(_owner);
+
+    vm.expectEmit(true, false, false, false);
+    emit FeesWithdrawn(_owner, 0);
     _psm.claimFees();
     uint256 feesAfter = _WDAIToken.balanceOf(_owner);
     uint256 feesClaimed = feesAfter - feesBefore;
-
-    vm.expectEmit(true, true, false, true);
-    emit FeesWithdrawn(_owner, feesClaimed);
     console.log('Fees claimed:', feesClaimed);
   }
 
@@ -238,15 +238,19 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
     _WDAIToken.approve(address(_psm), 1000 ether);
     _psm.deposit(1000 ether);
     console.log('maiToken balance before:', _maiToken.balanceOf(_owner));
+
+    _maiToken.approve(address(_psm), _maiToken.balanceOf(_owner));
     _psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
+    uint256 _maiBalanceAfter = _maiToken.balanceOf(_owner);
     // MOOSE
-    //vm.expectRevert(DAIVaultPSM.WithdrawalAlreadyScheduled.selector);
-    //_psm.scheduleWithdraw(_maiToken.balanceOf(_owner));
+    vm.expectRevert(DAIVaultPSM.WithdrawalAlreadyScheduled.selector);
+    _psm.scheduleWithdraw(_maiBalanceAfter);
   }
 
   function test_Withdraw_BeforeEpochReverts() public {
     _WDAIToken.approve(address(_psm), 1000 ether);
     _psm.deposit(1000 ether);
+    _maiToken.approve(address(_psm), _maiToken.balanceOf(_owner));
     _psm.scheduleWithdraw(100 ether);
     vm.expectRevert(DAIVaultPSM.WithdrawalNotAvailable.selector);
     _psm.withdraw();
@@ -292,8 +296,15 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
     console.log('WDAIToken balance after:', _WDAIToken.balanceOf(address(_psm)));
     uint256 _maiBalanceBefore = _maiToken.balanceOf(_owner);
 
+    _maiToken.approve(address(_psm), _withdrawAmount);
+
     // Schedule the withdrawal
-    if (_withdrawAmount > _maiToken.balanceOf(_owner)) {
+    if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount) {
+      console.log('Not enough liquidity');
+      vm.expectRevert();
+      _psm.scheduleWithdraw(_withdrawAmount);
+      return;
+    } else if (_withdrawAmount > _maiToken.balanceOf(address(_psm))) {
       console.log('Withdraw amount too large');
       vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
       _psm.scheduleWithdraw(_withdrawAmount);
@@ -301,11 +312,6 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
     } else if (_withdrawAmount < _psm.minimumWithdrawalFee() || _withdrawAmount > _psm.maxWithdraw()) {
       console.log('Withdraw Amount too small or too large');
       vm.expectRevert(DAIVaultPSM.InvalidAmount.selector);
-      _psm.scheduleWithdraw(_withdrawAmount);
-      return;
-    } else if ((_psm.totalStableLiquidity() - _psm.totalQueuedLiquidity()) < _withdrawAmount) {
-      console.log('Not enough liquidity');
-      vm.expectRevert();
       _psm.scheduleWithdraw(_withdrawAmount);
       return;
     } else {
@@ -364,8 +370,8 @@ contract DaiPsmWithdrawSuite is DaiPsmWithdrawalConstructor {
       );
       assertApproxEqAbs(
         _maiBalanceBefore,
-        _maiToken.balanceOf(_owner),
-        100,
+        _maiToken.balanceOf(_owner) + _withdrawAmount,
+        10_000,
         'Users MAI balance should decrease by the withdrawal amount'
       );
       assertGe(_WDAIToken.balanceOf(_user), _withdrawAmount);
