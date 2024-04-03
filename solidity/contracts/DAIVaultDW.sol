@@ -73,7 +73,7 @@ contract DAIVaultPSM {
   }
 
   modifier pausable() {
-    if (paused[msg.sig] || stopped && block.timestamp > upgradeTime) revert ContractIsPaused();
+    if (paused[msg.sig] || (stopped && block.timestamp > upgradeTime)) revert ContractIsPaused();
     _;
   }
 
@@ -132,7 +132,7 @@ contract DAIVaultPSM {
     if ((totalStableLiquidity - totalQueuedLiquidity) < _amount) revert NotEnoughLiquidity();
     totalQueuedLiquidity += _amount;
     scheduledWithdrawalAmount[msg.sender] = _amount;
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
+    IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
     emit WithdrawalScheduled(msg.sender, _amount);
   }
@@ -180,8 +180,7 @@ contract DAIVaultPSM {
   /// @notice Allows the owner to claim fees accumulated in the contract
   function claimFees() external onlyOwner {
     IL2DSR _beef = IL2DSR(gem);
-    // get total balance in underlying
-    //uint256 _shares = _beef.balanceOf(address(this));
+
     uint256 _totalStoredInUsd = _beef.totalAssets();
     if (_totalStoredInUsd > totalStableLiquidity) {
       uint256 _fees = (_totalStoredInUsd - totalStableLiquidity); // in USDC

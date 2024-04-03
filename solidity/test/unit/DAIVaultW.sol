@@ -78,22 +78,27 @@ contract DaiPsmAdminSuite is DaiPsmWithdrawalConstructor {
 
   function test_ClaimFees() public {
     _psm = new DAIVaultPSM();
-    _psm.initialize(address(_l2dsr), 100, 100);
+    _psm.initialize(address(_l2dsr), 0, 0);
     _l2dsr = IL2DSR(address(_l2dsr));
 
     vm.startPrank(_owner);
     deal(address(_WDAIToken), _owner, 10_000_000_000 ether);
     deal(address(_maiToken), address(_psm), 10_000_000_000 ether);
     _WDAIToken.approve(address(_psm), 1000 ether);
-    console.log('usdc balance:', _WDAIToken.balanceOf(_owner));
+    console.log('WDAI balance:', _WDAIToken.balanceOf(_owner));
     _psm.deposit(1000 ether);
 
     _WDAIToken.approve(address(_l2dsr), 1000 ether);
     _l2dsr.deposit(1000 ether, address(_psm));
 
-    vm.expectEmit(true, false, false, false);
-    emit FeesWithdrawn(_owner, 0);
+    uint256 feesBefore = _WDAIToken.balanceOf(_owner);
     _psm.claimFees();
+    uint256 feesAfter = _WDAIToken.balanceOf(_owner);
+    uint256 feesClaimed = feesAfter - feesBefore;
+
+    vm.expectEmit(true, true, false, true);
+    emit FeesWithdrawn(_owner, feesClaimed);
+    console.log('Fees claimed:', feesClaimed);
   }
 
   function test_TransferTokenWithoutUpgradeSet() public {
