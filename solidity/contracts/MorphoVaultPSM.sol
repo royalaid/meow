@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
 import {IFly} from '../interfaces/IFly.sol';
@@ -6,7 +7,7 @@ import {IERC20} from '../interfaces/IERC20.sol';
 contract MorphoVaultPSM {
   uint256 public constant MAX_INT =
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
-  address public constant MAI_ADDRESS = 0xf3B001D64C656e30a62fbaacA003B1336b4ce12A;
+  address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
 
   uint256 public totalStableLiquidity;
   uint256 public totalQueuedLiquidity;
@@ -18,6 +19,7 @@ contract MorphoVaultPSM {
   uint256 public maxDeposit;
   uint256 public maxWithdraw;
   uint256 public upgradeTime;
+  uint256 public decimalDifference;
 
   address public underlying;
   address public owner;
@@ -83,7 +85,7 @@ contract MorphoVaultPSM {
     }
     depositFee = _depositFee;
     withdrawalFee = _withdrawalFee;
-    minimumDepositFee = 1 ether;
+    minimumDepositFee = 0;
     minimumWithdrawalFee = 1 ether;
 
     IFly _beef = IFly(_gem);
@@ -91,6 +93,7 @@ contract MorphoVaultPSM {
     maxDeposit = 1e24; // 1 million ether
     maxWithdraw = 1e24; // 1 million ether
     underlying = _beef.asset();
+    decimalDifference = uint256(_beef.decimals() - IERC20(underlying).decimals());
     gem = _gem;
     initialized = true;
     approveGem();
@@ -113,10 +116,11 @@ contract MorphoVaultPSM {
     _amount = _amount - _fee;
     totalStableLiquidity += _amount;
 
-    if (IERC20(MAI_ADDRESS).balanceOf(address(this)) < _amount) {
+    uint256 scaledAmount = _amount * (10 ** decimalDifference);
+    if (IERC20(MAI_ADDRESS).balanceOf(address(this)) < scaledAmount) {
       revert InsufficientMAIBalance();
     }
-    IERC20(MAI_ADDRESS).transfer(msg.sender, _amount);
+    IERC20(MAI_ADDRESS).transfer(msg.sender, scaledAmount);
     emit Deposited(msg.sender, _amount);
   }
 
@@ -129,8 +133,9 @@ contract MorphoVaultPSM {
 
     if (_amount < minimumWithdrawalFee || _amount > maxWithdraw) revert InvalidAmount();
 
-    if ((totalStableLiquidity - totalQueuedLiquidity) < _amount) revert NotEnoughLiquidity();
-    totalQueuedLiquidity += _amount;
+    uint256 _toWithdraw = _amount / (10 ** decimalDifference);
+    if ((totalStableLiquidity - totalQueuedLiquidity) < _toWithdraw) revert NotEnoughLiquidity();
+    totalQueuedLiquidity += _toWithdraw;
     scheduledWithdrawalAmount[msg.sender] = _amount;
     IERC20(MAI_ADDRESS).transferFrom(msg.sender, address(this), _amount);
     withdrawalEpoch[msg.sender] = block.timestamp + 3 days;
@@ -146,7 +151,7 @@ contract MorphoVaultPSM {
     withdrawalEpoch[msg.sender] = 0;
     uint256 _amount = scheduledWithdrawalAmount[msg.sender];
     scheduledWithdrawalAmount[msg.sender] = 0;
-    uint256 _toWithdraw = _amount;
+    uint256 _toWithdraw = _amount / (10 ** decimalDifference);
     uint256 _fee = calculateFee(_toWithdraw, false);
     uint256 _toWithdrawwFee = (_toWithdraw - _fee);
     if (_toWithdraw > totalStableLiquidity) {
