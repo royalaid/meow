@@ -6,7 +6,7 @@ import {IERC20} from '../interfaces/IERC20.sol';
 contract USDCVaultDDW {
   uint256 public constant MAX_INT =
     115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935;
-  address public constant MAI_ADDRESS = 0xbf1aeA8670D2528E08334083616dD9C5F3B087aE;
+  address public constant MAI_ADDRESS = 0xdFA46478F9e5EA86d57387849598dbFB2e964b02;
   address public constant USDC_ADDRESS = 0xEA32A96608495e54156Ae48931A7c20f0dcc1a21;
 
   uint256 public totalStableLiquidity;

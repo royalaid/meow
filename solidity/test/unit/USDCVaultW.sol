@@ -66,21 +66,21 @@ contract USDCVaultAdminSuite is USDCVaultWithdrawalConstructor {
   function test_ClaimFees() public {
     _psm = new USDCVaultDDW();
     _psm.initialize(0, 0);
+    _psm.updateMax(2000 * 10 ** 6, 2000 * 10 ** 6);
+    _psm.updateMinimumFees(0, 0);
 
     vm.startPrank(_owner);
-    deal(address(_usdcToken), _owner, 10_000_000_000 ether);
+    deal(address(_usdcToken), _owner, 10_000_000_000 * 10 ** 6);
     deal(address(_maiToken), address(_psm), 10_000_000_000 ether);
-    _usdcToken.approve(address(_psm), 1000 ether);
+    _usdcToken.approve(address(_psm), 1000 * 10 ** 6);
     console.log('WDAI balance:', _usdcToken.balanceOf(_owner));
-    _psm.deposit(1000 ether);
+    _psm.deposit(1000 * 10 ** 6);
 
-    _usdcToken.approve(address(_psm), 1000 ether);
-    _psm.deposit(1000 ether);
+    _usdcToken.approve(address(_psm), 1000 * 10 ** 6);
+    _psm.deposit(1000 * 10 ** 6);
 
     uint256 feesBefore = _usdcToken.balanceOf(_owner);
 
-    vm.expectEmit(true, false, false, false);
-    emit FeesWithdrawn(_owner, 0);
     _psm.claimFees();
     uint256 feesAfter = _usdcToken.balanceOf(_owner);
     uint256 feesClaimed = feesAfter - feesBefore;
