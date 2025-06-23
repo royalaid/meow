@@ -18,7 +18,7 @@ contract MetisIntegrationBase is Test {
 
   USDCVaultDDW internal _psm;
 
-  function setUp() public {
+  function setUp() public virtual {
     vm.createSelectFork(vm.rpcUrl('metis'), _FORK_BLOCK);
     vm.startPrank(_owner);
     deal(address(_usdcToken), _owner, 100_000_000 * 10 ** 6);
